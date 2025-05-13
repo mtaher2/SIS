@@ -1,0 +1,113 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">Announcements</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/student/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Announcements</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Filter and Search -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form action="/student/announcements" method="GET" class="row g-3">
+                <div class="col-md-6">
+                    <label for="search" class="form-label">Search</label>
+                    <input type="text" class="form-control" id="search" name="search" 
+                           placeholder="Search by title or content" value="<%= locals.search || '' %>">
+                </div>
+                <div class="col-md-4">
+                    <label for="course" class="form-label">Filter by Course</label>
+                    <select class="form-select" id="course" name="course_id">
+                        <option value="">All Announcements</option>
+                        <% if (locals.courses && courses.length > 0) { %>
+                            <% courses.forEach(course => { %>
+                                <option value="<%= course.course_id %>" 
+                                    <%= locals.course_id == course.course_id ? 'selected' : '' %>>
+                                    <%= course.course_code %> - <%= course.title %>
+                                </option>
+                            <% }); %>
+                        <% } %>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Announcements List -->
+    <div class="row">
+        <% if (announcements && announcements.length > 0) { %>
+            <% announcements.forEach(announcement => { %>
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 announcement-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><%= announcement.title %></h5>
+                            <% if (announcement.target_type === 'all') { %>
+                                <span class="badge bg-primary">All Users</span>
+                            <% } else if (announcement.target_type === 'student') { %>
+                                <span class="badge bg-info">Students</span>
+                            <% } else if (announcement.target_type === 'course') { %>
+                                <span class="badge bg-success">Course: <%= announcement.course_code || '' %></span>
+                            <% } %>
+                        </div>
+                        <div class="card-body">
+                            <div class="announcement-content mb-3">
+                                <%= announcement.content %>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-auto">
+                                <small class="text-muted">
+                                    <i class="fas fa-user me-1"></i> <%= announcement.creator_name || 'Unknown' %>
+                                </small>
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar-alt me-1"></i> <%= new Date(announcement.created_at).toLocaleDateString() %>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <% }); %>
+        <% } else { %>
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> No announcements available at this time.
+                </div>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- Pagination -->
+    <% if (locals.totalPages && totalPages > 1) { %>
+        <nav aria-label="Announcement pagination" class="d-flex justify-content-center mt-4">
+            <ul class="pagination">
+                <% for (let i = 1; i <= totalPages; i++) { %>
+                    <li class="page-item <%= currentPage == i ? 'active' : '' %>">
+                        <a class="page-link" href="/student/announcements?page=<%= i %><%= locals.search ? '&search=' + search : '' %><%= locals.course_id ? '&course_id=' + course_id : '' %>"><%= i %></a>
+                    </li>
+                <% } %>
+            </ul>
+        </nav>
+    <% } %>
+</div>
+
+<style>
+    .announcement-card {
+        transition: transform 0.2s;
+    }
+    .announcement-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    .announcement-content {
+        white-space: pre-line;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+</style> 

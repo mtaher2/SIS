@@ -1,0 +1,161 @@
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit me-2"></i> Edit Course: <%= course.course_code %> - <%= course.title %>
+                    </h5>
+                </div>
+
+                <div class="card-body">
+                    <% if (locals.errors && errors.length > 0) { %>
+                        <div class="alert alert-danger">
+                            <ul class="mb-0">
+                                <% errors.forEach(error => { %>
+                                    <li><%= error.msg %></li>
+                                <% }); %>
+                            </ul>
+                        </div>
+                    <% } %>
+
+                    <form action="/admin/courses/edit/<%= course.course_id %>" method="POST">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="course_code" class="form-label">Course Code</label>
+                                <input type="text" class="form-control" id="course_code" name="course_code" 
+                                    value="<%= locals.formData ? formData.course_code : course.course_code %>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="title" class="form-label">Course Title</label>
+                                <input type="text" class="form-control" id="title" name="title"
+                                    value="<%= locals.formData ? formData.title : course.title %>" required>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="credit_hours" class="form-label">Credit Hours</label>
+                                <input type="number" class="form-control" id="credit_hours" name="credit_hours"
+                                    value="<%= locals.formData ? formData.credit_hours : course.credit_hours %>" min="1" max="6" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="semester_id" class="form-label">Semester</label>
+                                <select class="form-select" id="semester_id" name="semester_id" required>
+                                    <option value="">Select a semester</option>
+                                    <% if (semesters && semesters.length > 0) { %>
+                                        <% semesters.forEach(semester => { %>
+                                            <option value="<%= semester.semester_id %>" 
+                                                <%= locals.formData ? (formData.semester_id == semester.semester_id ? 'selected' : '') 
+                                                                    : (course.semester_id == semester.semester_id ? 'selected' : '') %>>
+                                                <%= semester.semester_name %> 
+                                                (<%= new Date(semester.start_date).toLocaleDateString() %> to 
+                                                <%= new Date(semester.end_date).toLocaleDateString() %>)
+                                                <%= semester.is_active ? '(Active)' : '' %>
+                                            </option>
+                                        <% }); %>
+                                    <% } %>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Course Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="4"><%= locals.formData ? formData.description : course.description %></textarea>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="is_active" class="form-label">Status</label>
+                                <select class="form-select" id="is_active" name="is_active" required>
+                                    <option value="true" <%= locals.formData ? (formData.is_active === 'true' ? 'selected' : '') 
+                                                                             : (course.is_active ? 'selected' : '') %>>Active</option>
+                                    <option value="false" <%= locals.formData ? (formData.is_active === 'false' ? 'selected' : '') 
+                                                                              : (!course.is_active ? 'selected' : '') %>>Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="mb-3">
+                            <label class="form-label">Assigned Instructors</label>
+                            <div class="instructor-selection">
+                                <% if (instructors && instructors.length > 0) { %>
+                                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+                                        <% const assignedInstructorIds = assignedInstructors.map(ai => ai.user_id); %>
+                                        <% instructors.forEach(instructor => { %>
+                                            <div class="col">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" 
+                                                        name="instructors" value="<%= instructor.user_id %>" 
+                                                        id="instructor-<%= instructor.user_id %>"
+                                                        <%= locals.formData && formData.instructors ? 
+                                                                (Array.isArray(formData.instructors) 
+                                                                    ? formData.instructors.includes(instructor.user_id.toString()) 
+                                                                    : formData.instructors === instructor.user_id.toString())
+                                                                ? 'checked' 
+                                                                : '' 
+                                                            : assignedInstructorIds.includes(instructor.user_id) ? 'checked' : '' %>>
+                                                    <label class="form-check-label" for="instructor-<%= instructor.user_id %>">
+                                                        <%= instructor.first_name %> <%= instructor.last_name %>
+                                                        <small class="d-block text-muted"><%= instructor.department || 'No Department' %></small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        <% }); %>
+                                    </div>
+                                <% } else { %>
+                                    <div class="alert alert-info">
+                                        No instructors available. <a href="/admin/users/create">Create an instructor</a> first.
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <div class="d-flex mt-4">
+                            <button type="submit" class="btn btn-primary me-2">Update Course</button>
+                            <a href="/admin/courses" class="btn btn-secondary me-2">Cancel</a>
+                            <a href="/admin/courses/<%= course.course_id %>/students" class="btn btn-info me-2">
+                                <i class="fas fa-users me-1"></i> Manage Students
+                            </a>
+                            <button type="button" class="btn btn-danger ms-auto"
+                                onclick="confirmDelete('/admin/courses/delete/<%= course.course_id %>')">
+                                <i class="fas fa-trash me-1"></i> Delete Course
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Course Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this course? This action cannot be undone and will remove all associated data, including enrollments and grades.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteForm" method="POST">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmDelete(url) {
+        document.getElementById('deleteForm').action = url;
+        new bootstrap.Modal(document.getElementById('deleteModal')).show();
+    }
+</script>
+

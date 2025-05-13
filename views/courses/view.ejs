@@ -1,0 +1,144 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2"><%= course.title %></h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/courses">Courses</a></li>
+                    <li class="breadcrumb-item active"><%= course.course_code %></li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <% if (locals.isEnrolled) { %>
+                <span class="badge bg-success">Enrolled</span>
+            <% } else if (locals.canEnroll) { %>
+                <form action="/student/courses/enroll" method="POST">
+                    <input type="hidden" name="course_id" value="<%= course.course_id %>">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-plus-circle me-1"></i> Enroll in Course
+                    </button>
+                </form>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Course Details -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i> Course Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <strong>Course Code:</strong>
+                            <p><%= course.course_code %></p>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Credit Hours:</strong>
+                            <p><%= course.credit_hours %></p>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Semester:</strong>
+                            <p><%= course.semester_name || 'Not specified' %></p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <strong>Description:</strong>
+                        <p class="mt-2"><%= course.description || 'No description available' %></p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <strong>Prerequisites:</strong>
+                        <p class="mt-2"><%= course.prerequisites || 'None' %></p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <strong>Learning Outcomes:</strong>
+                        <p class="mt-2"><%= course.learning_outcomes || 'Not specified' %></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Course Schedule -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i> Course Schedule</h5>
+                </div>
+                <div class="card-body">
+                    <% if (course.schedule) { %>
+                        <p><%= course.schedule %></p>
+                    <% } else { %>
+                        <p>Schedule information not available.</p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Instructor Information -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-chalkboard-teacher me-2"></i> Instructor</h5>
+                </div>
+                <div class="card-body">
+                    <% if (locals.instructors && instructors.length > 0) { %>
+                        <% instructors.forEach(instructor => { %>
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="flex-shrink-0">
+                                    <% if (instructor.profile_image) { %>
+                                        <img src="/storage/profile_images/<%= instructor.profile_image %>" alt="<%= instructor.name %>" class="rounded-circle" width="50">
+                                    <% } else { %>
+                                        <div class="avatar-initial rounded-circle bg-light text-dark d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                            <%= instructor.first_name.charAt(0) %><%= instructor.last_name.charAt(0) %>
+                                        </div>
+                                    <% } %>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h6 class="mb-0"><%= instructor.first_name %> <%= instructor.last_name %></h6>
+                                    <p class="text-muted mb-0"><%= instructor.department || 'No department' %></p>
+                                </div>
+                            </div>
+                            <% if (instructor.office_hours) { %>
+                                <p><strong>Office Hours:</strong> <%= instructor.office_hours %></p>
+                            <% } %>
+                            <% if (instructor.office_location) { %>
+                                <p><strong>Office:</strong> <%= instructor.office_location %></p>
+                            <% } %>
+                        <% }); %>
+                    <% } else { %>
+                        <p>No instructor assigned to this course yet.</p>
+                    <% } %>
+                </div>
+            </div>
+            
+            <!-- Course Stats -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i> Course Stats</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <span>Enrolled Students:</span>
+                        <span class="badge bg-secondary"><%= locals.enrolledCount || 0 %></span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span>Available Seats:</span>
+                        <span class="badge bg-<%= (course.capacity - (locals.enrolledCount || 0)) > 5 ? 'success' : ((course.capacity - (locals.enrolledCount || 0)) > 0 ? 'warning' : 'danger') %>">
+                            <%= course.capacity ? (course.capacity - (locals.enrolledCount || 0)) : 'Unlimited' %>
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Course Materials:</span>
+                        <span class="badge bg-info"><%= locals.materialsCount || 0 %></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

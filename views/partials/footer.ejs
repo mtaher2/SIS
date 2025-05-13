@@ -1,0 +1,38 @@
+<!-- Footer partial - included at the bottom of each page -->
+<footer class="bg-light py-4 mt-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6">
+                <h5>Student Information System</h5>
+                <p class="text-muted">Manage courses, enrollments, and academic records efficiently.</p>
+            </div>
+            <div class="col-md-3">
+                <h5>Quick Links</h5>
+                <ul class="list-unstyled">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/courses">Courses</a></li>
+                    <% if (locals.user) { %>
+                        <li><a href="/auth/change-password">Change Password</a></li>
+                        <li><a href="/auth/logout">Logout</a></li>
+                    <% } else { %>
+                        <li><a href="/auth/login">Login</a></li>
+                        <li><a href="/auth/register">Register</a></li>
+                    <% } %>
+                </ul>
+            </div>
+            <div class="col-md-3">
+                <h5>Contact</h5>
+                <address class="text-muted">
+                    <strong>Admin Support</strong><br>
+                    Email: admin@sis.edu<br>
+                    Phone: (123) 456-7890
+                </address>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12 text-center text-muted">
+                <small>&copy; 2023 Student Information System. All rights reserved.</small>
+            </div>
+        </div>
+    </div>
+</footer> 

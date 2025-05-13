@@ -1,0 +1,146 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">Manage Course Students</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/admin/dashboard">Admin Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/admin/courses">Courses</a></li>
+                    <li class="breadcrumb-item active">Manage Students</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-book me-2"></i> <%= course.title %> (<%= course.course_code %>)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <p><strong>Instructor:</strong> <%= course.instructor_name || 'Not assigned' %></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Semester:</strong> <%= course.semester_name || 'Not specified' %></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Credit Hours:</strong> <%= course.credit_hours %></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users me-2"></i> Students Enrolled
+                    </h5>
+                    <a href="/admin/courses/<%= course.course_id %>/add-students" class="btn btn-light">
+                        <i class="fas fa-user-plus me-1"></i> Add Students
+                    </a>
+                </div>
+
+                <div class="card-body">
+                    <% if (locals.success_msg) { %>
+                        <div class="alert alert-success">
+                            <%= success_msg %>
+                        </div>
+                    <% } %>
+                    
+                    <% if (locals.error_msg) { %>
+                        <div class="alert alert-danger">
+                            <%= error_msg %>
+                        </div>
+                    <% } %>
+
+                    <!-- Enrolled Students -->
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Student ID</th>
+                                    <th>Email</th>
+                                    <th>Enrollment Date</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (enrolledStudents && enrolledStudents.length > 0) { %>
+                                    <% enrolledStudents.forEach(student => { %>
+                                        <tr>
+                                            <td><%= student.first_name %> <%= student.last_name %></td>
+                                            <td><%= student.student_id || 'N/A' %></td>
+                                            <td><%= student.email %></td>
+                                            <td><%= new Date(student.enrollment_date).toLocaleDateString() %></td>
+                                            <td>
+                                                <% if (student.is_active) { %>
+                                                    <span class="badge bg-success">Active</span>
+                                                <% } else { %>
+                                                    <span class="badge bg-danger">Inactive</span>
+                                                <% } %>
+                                            </td>
+                                            <td class="text-end">
+                                                <a href="/admin/users/edit/<%= student.user_id %>" class="btn btn-sm btn-primary me-1" title="Edit Student">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <button type="button" class="btn btn-sm btn-danger" title="Remove from Course"
+                                                        onclick="confirmRemove('<%= course.course_id %>', '<%= student.user_id %>', '<%= student.first_name %> <%= student.last_name %>')">
+                                                    <i class="fas fa-user-minus"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                <% } else { %>
+                                    <tr>
+                                        <td colspan="6" class="text-center">
+                                            No students enrolled in this course yet.
+                                        </td>
+                                    </tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Remove Student Confirmation Modal -->
+<div class="modal fade" id="removeStudentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Student Removal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to remove <span id="studentName" class="fw-bold"></span> from this course? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="removeStudentForm" method="POST">
+                    <button type="submit" class="btn btn-danger">Remove</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmRemove(courseId, studentId, studentName) {
+        document.getElementById('removeStudentForm').action = `/admin/courses/${courseId}/students/${studentId}/remove`;
+        document.getElementById('studentName').textContent = studentName;
+        new bootstrap.Modal(document.getElementById('removeStudentModal')).show();
+    }
+</script> 

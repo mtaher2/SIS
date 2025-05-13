@@ -1,0 +1,320 @@
+<!-- Student Dashboard -->
+<div class="student-dashboard">
+    <!-- Dashboard Header -->
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h1 class="dashboard-heading">
+                <i class="fas fa-user-graduate me-2"></i> Student Dashboard
+            </h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item active">Student Dashboard</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <span class="badge rounded-pill" style="background-color: var(--secondary-color);">
+                Student Access
+            </span>
+        </div>
+    </div>
+
+    <!-- Student Profile Summary -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card student-profile-summary h-100">
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <div class="profile-img">
+                            <% if (user.profile_image) { %>
+                                <img src="/storage/profile_images/<%= user.profile_image %>" alt="Profile Image" class="img-fluid rounded-circle">
+                            <% } else { %>
+                                <i class="fas fa-user-circle"></i>
+                            <% } %>
+                        </div>
+                        <h3><%= user.first_name %> <%= user.last_name %></h3>
+                        <p class="text-muted"><%= user.student_id || 'ID not available' %></p>
+                    </div>
+                    <hr>
+                    <h5 class="text-center mb-3">GPA Overview</h5>
+                    <div class="text-center mb-3">
+                        <div class="student-gpa"><%= gpa && gpa.current ? gpa.current.toFixed(2) : '0.00' %></div>
+                        <p class="text-muted">Current GPA</p>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <a href="/student/profile" class="btn btn-primary">
+                            <i class="fas fa-user me-2"></i> View Profile
+                        </a>
+                        <a href="/student/gpa-calculator" class="btn btn-outline-primary">
+                            <i class="fas fa-calculator me-2"></i> GPA Calculator
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Academic Overview -->
+        <div class="col-md-8">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <div class="card stats-card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-book stats-icon"></i>
+                            <h2><%= stats.currentCourses %></h2>
+                            <p class="text-muted mb-0">Current Courses</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card stats-card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-graduation-cap stats-icon"></i>
+                            <h2><%= stats.completedCourses %></h2>
+                            <p class="text-muted mb-0">Completed Courses</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card stats-card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-award stats-icon"></i>
+                            <h2><%= stats.totalCredits %></h2>
+                            <p class="text-muted mb-0">Credit Hours</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <a href="/student/courses" class="btn btn-primary d-block">
+                                        <i class="fas fa-book-open me-2"></i> My Courses
+                                    </a>
+                                </div>
+                                <div class="col-md-4">
+                                    <a href="/student/grades" class="btn btn-success d-block">
+                                        <i class="fas fa-chart-line me-2"></i> My Grades
+                                    </a>
+                                </div>
+                                <div class="col-md-4">
+                                    <a href="/student/announcements" class="btn btn-info d-block text-white">
+                                        <i class="fas fa-bullhorn me-2"></i> Announcements
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Courses -->
+    <div class="mt-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-book-open me-2"></i> My Current Courses</h5>
+                <div>
+                    <a href="/student/courses" class="btn btn-primary btn-sm">
+                        <i class="fas fa-th-list me-1"></i> View All
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <% if(currentCourses && currentCourses.length > 0) { %>
+                    <div class="course-grid">
+                        <% currentCourses.forEach(course => { %>
+                            <div class="card course-card h-100">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><%= course.title %></h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between mb-3">
+                                        <span class="badge rounded-pill bg-secondary"><%= course.course_code %></span>
+                                        <span class="badge rounded-pill bg-info"><%= course.credit_hours %> Credits</span>
+                                    </div>
+                                    <p class="card-text mb-3"><%= course.description.substring(0, 100) %>...</p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-muted"><i class="fas fa-chalkboard-teacher me-1"></i> <%= course.instructor_name %></span>
+                                        <% if (course.current_grade) { %>
+                                            <span class="badge rounded-pill bg-<%= course.current_grade >= 90 ? 'success' : course.current_grade >= 80 ? 'primary' : course.current_grade >= 70 ? 'info' : course.current_grade >= 60 ? 'warning' : 'danger' %>">
+                                                <%= course.current_grade %>%
+                                            </span>
+                                        <% } else { %>
+                                            <span class="badge rounded-pill bg-secondary">No Grade</span>
+                                        <% } %>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0">
+                                    <a href="/student/courses/<%= course.id %>" class="btn btn-primary d-block">
+                                        <i class="fas fa-eye me-1"></i> View Course
+                                    </a>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </div>
+                <% } else { %>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i> You are not enrolled in any courses this semester.
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Announcements -->
+    <div class="row mt-4">
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-bullhorn me-2"></i> Recent Announcements</h5>
+                    <a href="/student/announcements" class="btn btn-primary btn-sm">
+                        <i class="fas fa-th-list me-1"></i> View All
+                    </a>
+                </div>
+                <div class="card-body">
+                    <% if(recentAnnouncements && recentAnnouncements.length > 0) { %>
+                        <div class="list-group">
+                            <% recentAnnouncements.forEach(announcement => { %>
+                                <a href="/announcements/<%= announcement.id %>" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h5 class="mb-1"><%= announcement.title %></h5>
+                                        <small><%= new Date(announcement.created_at).toLocaleDateString() %></small>
+                                    </div>
+                                    <p class="mb-1 announcement-preview"><%= announcement.content %></p>
+                                    <div class="d-flex justify-content-between align-items-center mt-2">
+                                        <small class="text-muted">
+                                            <i class="fas fa-user me-1"></i> <%= announcement.author_name %>
+                                        </small>
+                                        <% if(announcement.course_id) { %>
+                                            <span class="badge badge-target-course">Course: <%= announcement.course_code %></span>
+                                        <% } else { %>
+                                            <span class="badge badge-target-all">General</span>
+                                        <% } %>
+                                    </div>
+                                </a>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i> No recent announcements.
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Assignments -->
+        <div class="col-md-5">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-tasks me-2"></i> Upcoming Assignments</h5>
+                </div>
+                <div class="card-body">
+                    <% if(upcomingAssignments && upcomingAssignments.length > 0) { %>
+                        <div class="list-group">
+                            <% upcomingAssignments.forEach(assignment => { %>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between mb-1">
+                                        <h6 class="mb-0"><%= assignment.title %></h6>
+                                        <small class="text-muted"><%= assignment.course_code %></small>
+                                    </div>
+                                    <% 
+                                        const dueDate = new Date(assignment.due_date);
+                                        const today = new Date();
+                                        const diffTime = dueDate - today;
+                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                    %>
+                                    <div class="d-flex justify-content-between mt-2">
+                                        <small class="<%= diffDays <= 3 ? 'text-danger' : diffDays <= 7 ? 'text-warning' : 'text-muted' %>">
+                                            <i class="fas fa-calendar-alt me-1"></i> Due: <%= dueDate.toLocaleDateString() %>
+                                        </small>
+                                        <small>
+                                            <% if(diffDays <= 3) { %>
+                                                <span class="badge bg-danger"><%= diffDays %> days left</span>
+                                            <% } else if(diffDays <= 7) { %>
+                                                <span class="badge bg-warning text-dark"><%= diffDays %> days left</span>
+                                            <% } else { %>
+                                                <span class="badge bg-success"><%= diffDays %> days left</span>
+                                            <% } %>
+                                        </small>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i> No upcoming assignments.
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GPA Trend Chart -->
+    <div class="mt-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i> GPA Trend</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="gpaChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // GPA Chart
+        const gpaData = <%= JSON.stringify(gpaHistory) %>;
+        
+        if (gpaData && gpaData.length > 0) {
+            const ctx = document.getElementById('gpaChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: gpaData.map(item => item.semester_name),
+                    datasets: [{
+                        label: 'Semester GPA',
+                        data: gpaData.map(item => item.gpa),
+                        backgroundColor: '#99C65E',
+                        borderColor: '#212856',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#212856',
+                        pointRadius: 5,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: Math.max(0, Math.min(...gpaData.map(item => item.gpa)) - 0.5),
+                            max: Math.min(4, Math.max(...gpaData.map(item => item.gpa)) + 0.5)
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        } else {
+            document.getElementById('gpaChart').parentElement.innerHTML = '<div class="alert alert-info text-center">No GPA history available</div>';
+        }
+    });
+</script> 

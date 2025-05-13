@@ -1,0 +1,128 @@
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit me-2"></i> Edit Announcement
+                    </h5>
+                </div>
+
+                <div class="card-body">
+                    <% if (locals.errors && errors.length > 0) { %>
+                        <div class="alert alert-danger">
+                            <ul class="mb-0">
+                                <% errors.forEach(error => { %>
+                                    <li><%= error.msg %></li>
+                                <% }); %>
+                            </ul>
+                        </div>
+                    <% } %>
+
+                    <form action="/instructor/announcements/edit/<%= announcement.announcement_id %>" method="POST">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Announcement Title</label>
+                            <input type="text" class="form-control" id="title" name="title" 
+                                value="<%= locals.formData ? formData.title : announcement.title %>" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="content" class="form-label">Announcement Content</label>
+                            <textarea class="form-control" id="content" name="content" rows="6" required><%= locals.formData ? formData.content : announcement.content %></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="target_type" class="form-label">Target Audience</label>
+                            <select class="form-select" id="target_type" name="target_type" required>
+                                <option value="">Select target audience</option>
+                                <option value="instructor" <%= (locals.formData ? formData.target_type === 'instructor' : announcement.target_type === 'instructor') ? 'selected' : '' %>>All Instructors</option>
+                                <option value="course" <%= (locals.formData ? formData.target_type === 'course' : announcement.target_type === 'course') ? 'selected' : '' %>>Specific Course</option>
+                            </select>
+                        </div>
+
+                        <div id="course-selection" class="mb-3" style="display: none;">
+                            <label for="course_id" class="form-label">Select Course</label>
+                            <select class="form-select" id="course_id" name="course_id">
+                                <option value="">Select a course</option>
+                                <% if (locals.courses && courses.length > 0) { %>
+                                    <% courses.forEach(course => { %>
+                                        <option value="<%= course.course_id %>" 
+                                            <%= (locals.formData ? formData.course_id == course.course_id : announcement.course_id == course.course_id) ? 'selected' : '' %>>
+                                            <%= course.course_code %> - <%= course.title %>
+                                        </option>
+                                    <% }); %>
+                                <% } %>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="is_active" class="form-label">Status</label>
+                            <select class="form-select" id="is_active" name="is_active" required>
+                                <option value="true" <%= (locals.formData ? formData.is_active === 'true' : announcement.is_active) ? 'selected' : '' %>>Active</option>
+                                <option value="false" <%= (locals.formData ? formData.is_active === 'false' : !announcement.is_active) ? 'selected' : '' %>>Inactive</option>
+                            </select>
+                        </div>
+
+                        <div class="d-flex mt-4">
+                            <button type="submit" class="btn btn-primary me-2">Update Announcement</button>
+                            <a href="/instructor/announcements" class="btn btn-secondary me-2">Cancel</a>
+                            <button type="button" class="btn btn-danger ms-auto"
+                                onclick="confirmDelete('/instructor/announcements/delete/<%= announcement.announcement_id %>')">
+                                <i class="fas fa-trash me-1"></i> Delete Announcement
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Announcement Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this announcement? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteForm" method="POST">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const targetTypeSelect = document.getElementById('target_type');
+        const courseSelection = document.getElementById('course-selection');
+        
+        function updateCourseSelection() {
+            if (targetTypeSelect.value === 'course') {
+                courseSelection.style.display = 'block';
+                document.getElementById('course_id').setAttribute('required', 'required');
+            } else {
+                courseSelection.style.display = 'none';
+                document.getElementById('course_id').removeAttribute('required');
+            }
+        }
+        
+        // Initial update
+        updateCourseSelection();
+        
+        // Update whenever selection changes
+        targetTypeSelect.addEventListener('change', updateCourseSelection);
+    });
+    
+    function confirmDelete(url) {
+        document.getElementById('deleteForm').action = url;
+        new bootstrap.Modal(document.getElementById('deleteModal')).show();
+    }
+</script> 

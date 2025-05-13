@@ -1,0 +1,523 @@
+const User = require('../models/User');
+const Instructor = require('../models/Instructor');
+const Course = require('../models/Course');
+const Announcement = require('../models/Announcement');
+const { validationResult } = require('express-validator');
+const { upload, deleteFile } = require('../utils/upload');
+const db = require('../db');
+
+// Instructor dashboard
+exports.getDashboard = async (req, res) => {
+    try {
+        const instructorId = req.session.user.user_id;
+        
+        // Get profile info
+        const profile = await Instructor.findByUserId(instructorId);
+        
+        // Get instructor's courses
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        
+        // Get recent announcements made by this instructor
+        const announcements = await Announcement.findAll({
+            created_by: instructorId,
+            limit: 5
+        });
+        
+        // Calculate stats
+        const stats = {
+            totalCourses: courses ? courses.length : 0,
+            totalStudents: 0,
+            totalAnnouncements: announcements ? announcements.length : 0
+        };
+        
+        // Count total students across all courses
+        if (courses && courses.length > 0) {
+            // Get the count of students for each course
+            for (const course of courses) {
+                const students = await Instructor.getCourseStudents(course.course_id, instructorId);
+                stats.totalStudents += students ? students.length : 0;
+            }
+        }
+        
+        // Get upcoming assignments
+        const upcomingAssignments = [];
+        
+        res.render('instructor/dashboard', {
+            title: 'Instructor Dashboard',
+            user: req.session.user,
+            profile,
+            courses,
+            announcements,
+            stats,
+            upcomingAssignments
+        });
+    } catch (error) {
+        console.error('Error in instructor dashboard:', error);
+        req.flash('error_msg', 'An error occurred while loading the dashboard');
+        res.redirect('/');
+    }
+};
+
+// View profile
+exports.getProfile = async (req, res) => {
+    try {
+        const instructorId = req.session.user.user_id;
+        const profile = await Instructor.findByUserId(instructorId);
+        
+        res.render('instructor/profile', {
+            title: 'My Profile',
+            user: req.session.user,
+            profile
+        });
+    } catch (error) {
+        console.error('Error getting instructor profile:', error);
+        req.flash('error_msg', 'An error occurred while retrieving your profile');
+        res.redirect('/instructor/dashboard');
+    }
+};
+
+// Update profile form
+exports.getUpdateProfile = async (req, res) => {
+    try {
+        const instructorId = req.session.user.user_id;
+        const profile = await Instructor.findByUserId(instructorId);
+        
+        res.render('instructor/update-profile', {
+            title: 'Update Profile',
+            user: req.session.user,
+            profile
+        });
+    } catch (error) {
+        console.error('Error getting update profile form:', error);
+        req.flash('error_msg', 'An error occurred while preparing the profile form');
+        res.redirect('/instructor/profile');
+    }
+};
+
+// Process update profile form
+exports.postUpdateProfile = async (req, res) => {
+    try {
+        const instructorId = req.session.user.user_id;
+        
+        // Update profile
+        const profileData = {
+            department: req.body.department,
+            office_location: req.body.office_location,
+            office_hours: req.body.office_hours
+        };
+        
+        await Instructor.update(instructorId, profileData);
+        
+        req.flash('success_msg', 'Profile updated successfully');
+        res.redirect('/instructor/profile');
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        req.flash('error_msg', 'An error occurred while updating your profile');
+        res.redirect('/instructor/update-profile');
+    }
+};
+
+// Course management - list instructor's courses
+exports.getCourses = async (req, res) => {
+    try {
+        const instructorId = req.session.user.user_id;
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        
+        res.render('instructor/courses', {
+            title: 'My Courses',
+            user: req.session.user,
+            courses
+        });
+    } catch (error) {
+        console.error('Error getting instructor courses:', error);
+        req.flash('error_msg', 'An error occurred while retrieving your courses');
+        res.redirect('/instructor/dashboard');
+    }
+};
+
+// View course details
+exports.getCourse = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const instructorId = req.session.user.user_id;
+        
+        // Check if instructor is assigned to this course
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        const isCourseAssigned = courses.some(course => course.course_id == courseId);
+        
+        if (!isCourseAssigned) {
+            req.flash('error_msg', 'You are not authorized to view this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        // Get course details
+        const course = await Course.findById(courseId);
+        
+        // Get students enrolled in this course
+        const students = await Instructor.getCourseStudents(courseId, instructorId);
+        
+        // Get course materials
+        const materials = await Course.getMaterials(courseId);
+        
+        // Get assignments
+        const assignments = await Course.getAssignments(courseId);
+        
+        res.render('instructor/course-details', {
+            title: course.title,
+            user: req.session.user,
+            course,
+            students,
+            materials,
+            assignments
+        });
+    } catch (error) {
+        console.error('Error getting course details:', error);
+        req.flash('error_msg', 'An error occurred while retrieving course details');
+        res.redirect('/instructor/courses');
+    }
+};
+
+// Course material management
+exports.getAddMaterial = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const instructorId = req.session.user.user_id;
+        
+        // Check if instructor is assigned to this course
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        const isCourseAssigned = courses.some(course => course.course_id == courseId);
+        
+        if (!isCourseAssigned) {
+            req.flash('error_msg', 'You are not authorized to add materials to this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        // Get course details
+        const course = await Course.findById(courseId);
+        
+        res.render('instructor/add-material', {
+            title: `Add Material - ${course.title}`,
+            user: req.session.user,
+            course
+        });
+    } catch (error) {
+        console.error('Error getting add material form:', error);
+        req.flash('error_msg', 'An error occurred while preparing the material form');
+        res.redirect(`/instructor/courses/${req.params.id}`);
+    }
+};
+
+// Process add material form
+exports.postAddMaterial = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const instructorId = req.session.user.user_id;
+        
+        // Check if instructor is assigned to this course
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        const isCourseAssigned = courses.some(course => course.course_id == courseId);
+        
+        if (!isCourseAssigned) {
+            req.flash('error_msg', 'You are not authorized to add materials to this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        const { title, description, material_type, link_url } = req.body;
+        
+        // Create material data
+        const materialData = {
+            course_id: courseId,
+            title,
+            description,
+            file_path: req.file ? `/storage/${req.file.filename}` : null,
+            link_url: material_type === 'link' ? link_url : null,
+            material_type,
+            uploaded_by: instructorId
+        };
+        
+        await Course.addMaterial(materialData);
+        
+        req.flash('success_msg', 'Material added successfully');
+        res.redirect(`/instructor/courses/${courseId}`);
+    } catch (error) {
+        console.error('Error adding material:', error);
+        req.flash('error_msg', 'An error occurred while adding the material');
+        res.redirect(`/instructor/courses/${req.params.id}/add-material`);
+    }
+};
+
+// Delete material
+exports.deleteMaterial = async (req, res) => {
+    try {
+        const materialId = req.params.materialId;
+        const instructorId = req.session.user.user_id;
+        
+        // Delete material
+        const result = await Course.deleteMaterial(materialId, instructorId);
+        
+        if (result.success) {
+            // Delete file if exists
+            if (result.filePath) {
+                deleteFile(result.filePath);
+            }
+            
+            req.flash('success_msg', 'Material deleted successfully');
+        } else {
+            req.flash('error_msg', 'Failed to delete material');
+        }
+        
+        res.redirect(`/instructor/courses/${req.params.id}`);
+    } catch (error) {
+        console.error('Error deleting material:', error);
+        req.flash('error_msg', 'An error occurred while deleting the material');
+        res.redirect(`/instructor/courses/${req.params.id}`);
+    }
+};
+
+// Assignment management
+exports.getAddAssignment = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const instructorId = req.session.user.user_id;
+        
+        // Check if instructor is assigned to this course
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        const isCourseAssigned = courses.some(course => course.course_id == courseId);
+        
+        if (!isCourseAssigned) {
+            req.flash('error_msg', 'You are not authorized to add assignments to this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        // Get course details
+        const course = await Course.findById(courseId);
+        
+        res.render('instructor/add-assignment', {
+            title: `Add Assignment - ${course.title}`,
+            user: req.session.user,
+            course
+        });
+    } catch (error) {
+        console.error('Error getting add assignment form:', error);
+        req.flash('error_msg', 'An error occurred while preparing the assignment form');
+        res.redirect(`/instructor/courses/${req.params.id}`);
+    }
+};
+
+// Process add assignment form
+exports.postAddAssignment = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const instructorId = req.session.user.user_id;
+        
+        // Check if instructor is assigned to this course
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        const isCourseAssigned = courses.some(course => course.course_id == courseId);
+        
+        if (!isCourseAssigned) {
+            req.flash('error_msg', 'You are not authorized to add assignments to this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        const { title, description, due_date, max_points, weight_percentage } = req.body;
+        
+        // Create assignment data
+        const assignmentData = {
+            course_id: courseId,
+            title,
+            description,
+            due_date,
+            max_points,
+            weight_percentage,
+            created_by: instructorId
+        };
+        
+        await Course.addAssignment(assignmentData);
+        
+        req.flash('success_msg', 'Assignment added successfully');
+        res.redirect(`/instructor/courses/${courseId}`);
+    } catch (error) {
+        console.error('Error adding assignment:', error);
+        req.flash('error_msg', 'An error occurred while adding the assignment');
+        res.redirect(`/instructor/courses/${req.params.id}/add-assignment`);
+    }
+};
+
+// Announcement management
+exports.getAnnouncements = async (req, res) => {
+    try {
+        const instructorId = req.session.user.user_id;
+        const announcements = await Announcement.findAll({
+            created_by: instructorId
+        });
+        
+        res.render('instructor/announcements', {
+            title: 'My Announcements',
+            user: req.session.user,
+            announcements
+        });
+    } catch (error) {
+        console.error('Error getting announcements:', error);
+        req.flash('error_msg', 'An error occurred while retrieving announcements');
+        res.redirect('/instructor/dashboard');
+    }
+};
+
+// Create course announcement
+exports.getCreateAnnouncement = async (req, res) => {
+    try {
+        const instructorId = req.session.user.user_id;
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        
+        res.render('instructor/create-announcement', {
+            title: 'Create Announcement',
+            user: req.session.user,
+            courses
+        });
+    } catch (error) {
+        console.error('Error getting create announcement form:', error);
+        req.flash('error_msg', 'An error occurred while preparing the announcement form');
+        res.redirect('/instructor/announcements');
+    }
+};
+
+// Process create announcement form
+exports.postCreateAnnouncement = async (req, res) => {
+    try {
+        const instructorId = req.session.user.user_id;
+        const { title, content, target_type, course_id } = req.body;
+        
+        // If targeting a course, ensure instructor is assigned to it
+        if (target_type === 'course') {
+            const courses = await Instructor.getAssignedCourses(instructorId);
+            const isCourseAssigned = courses.some(course => course.course_id == course_id);
+            
+            if (!isCourseAssigned) {
+                req.flash('error_msg', 'You are not authorized to create announcements for this course');
+                return res.redirect('/instructor/announcements/create');
+            }
+        }
+        
+        // Create announcement
+        const announcementData = {
+            title,
+            content,
+            created_by: instructorId,
+            target_type,
+            course_id: target_type === 'course' ? course_id : null,
+            is_active: true
+        };
+        
+        await Announcement.create(announcementData);
+        
+        req.flash('success_msg', 'Announcement created successfully');
+        res.redirect('/instructor/announcements');
+    } catch (error) {
+        console.error('Error creating announcement:', error);
+        req.flash('error_msg', 'An error occurred while creating the announcement');
+        res.redirect('/instructor/announcements/create');
+    }
+};
+
+// Grade management - view assignments
+exports.getGradeAssignment = async (req, res) => {
+    try {
+        const courseId = req.params.courseId;
+        const assignmentId = req.params.assignmentId;
+        const instructorId = req.session.user.user_id;
+        
+        // Check if instructor is assigned to this course
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        const isCourseAssigned = courses.some(course => course.course_id == courseId);
+        
+        if (!isCourseAssigned) {
+            req.flash('error_msg', 'You are not authorized to grade assignments for this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        // Get assignment details
+        const [assignment] = await db.query(
+            'SELECT * FROM assignments WHERE assignment_id = ? AND course_id = ?',
+            [assignmentId, courseId]
+        );
+        
+        if (assignment.length === 0) {
+            req.flash('error_msg', 'Assignment not found');
+            return res.redirect(`/instructor/courses/${courseId}`);
+        }
+        
+        // Get students in this course
+        const students = await Instructor.getCourseStudents(courseId, instructorId);
+        
+        // Get existing grades
+        const [grades] = await db.query(
+            'SELECT * FROM grades WHERE assignment_id = ?',
+            [assignmentId]
+        );
+        
+        res.render('instructor/grade-assignment', {
+            title: `Grade Assignment - ${assignment[0].title}`,
+            user: req.session.user,
+            assignment: assignment[0],
+            students,
+            grades,
+            courseId
+        });
+    } catch (error) {
+        console.error('Error getting grade assignment form:', error);
+        req.flash('error_msg', 'An error occurred while preparing the grading form');
+        res.redirect(`/instructor/courses/${req.params.courseId}`);
+    }
+};
+
+// Process grading form
+exports.postGradeAssignment = async (req, res) => {
+    try {
+        const courseId = req.params.courseId;
+        const assignmentId = req.params.assignmentId;
+        const instructorId = req.session.user.user_id;
+        
+        // Check if instructor is assigned to this course
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        const isCourseAssigned = courses.some(course => course.course_id == courseId);
+        
+        if (!isCourseAssigned) {
+            req.flash('error_msg', 'You are not authorized to grade assignments for this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        // Process each student's grade
+        const studentIds = Array.isArray(req.body.student_id) 
+            ? req.body.student_id 
+            : [req.body.student_id];
+        
+        const points = Array.isArray(req.body.points_earned) 
+            ? req.body.points_earned 
+            : [req.body.points_earned];
+        
+        const comments = Array.isArray(req.body.comments) 
+            ? req.body.comments 
+            : [req.body.comments];
+        
+        for (let i = 0; i < studentIds.length; i++) {
+            if (points[i] !== '') {
+                const gradeData = {
+                    student_id: studentIds[i],
+                    assignment_id: assignmentId,
+                    points_earned: points[i],
+                    graded_by: instructorId,
+                    comments: comments[i] || null
+                };
+                
+                await Instructor.recordGrade(gradeData);
+            }
+        }
+        
+        req.flash('success_msg', 'Grades recorded successfully');
+        res.redirect(`/instructor/courses/${courseId}`);
+    } catch (error) {
+        console.error('Error recording grades:', error);
+        req.flash('error_msg', 'An error occurred while recording grades');
+        res.redirect(`/instructor/courses/${req.params.courseId}/assignments/${req.params.assignmentId}/grade`);
+    }
+}; 

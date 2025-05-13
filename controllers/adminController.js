@@ -1,0 +1,662 @@
+const User = require('../models/User');
+const Student = require('../models/Student');
+const Instructor = require('../models/Instructor');
+const Course = require('../models/Course');
+const Announcement = require('../models/Announcement');
+const { validationResult } = require('express-validator');
+const db = require('../db');
+
+// Admin dashboard
+exports.getDashboard = async (req, res) => {
+    try {
+        // Get counts for dashboard stats
+        const studentResults = await User.findByRole('student');
+        const instructorResults = await User.findByRole('instructor');
+        const courses = await Course.findAll() || [];
+        
+        const stats = {
+            students: Array.isArray(studentResults) ? studentResults.length : 0,
+            instructors: Array.isArray(instructorResults) ? instructorResults.length : 0,
+            totalUsers: (Array.isArray(studentResults) ? studentResults.length : 0) + 
+                        (Array.isArray(instructorResults) ? instructorResults.length : 0) + 1, // +1 for admin
+            courses: courses.length,
+            activeCourses: courses.filter(course => course.is_active).length
+        };
+        
+        // Get recent users
+        const users = await User.findAll() || [];
+        const recentUsers = users.slice(0, 5); // Get only the first 5 users
+        
+        // Get recent courses
+        const recentCourses = courses.slice(0, 5); // Get only the first 5 courses
+        
+        // Get recent announcements
+        const announcements = await Announcement.findAll({
+            created_by: req.session.user.user_id,
+            limit: 5
+        }) || [];
+        
+        // Use announcements as recentAnnouncements to match template variable name
+        const recentAnnouncements = announcements;
+        
+        res.render('admin/dashboard', {
+            title: 'Admin Dashboard',
+            user: req.session.user,
+            currentUser: req.session.user, // For "current user" comparison
+            stats,
+            announcements,
+            recentUsers,
+            recentCourses,
+            recentAnnouncements
+        });
+    } catch (error) {
+        console.error('Error in admin dashboard:', error);
+        req.flash('error_msg', 'An error occurred while loading the dashboard');
+        res.redirect('/');
+    }
+};
+
+// User management - list all users
+exports.getUsers = async (req, res) => {
+    try {
+        const users = await User.findAll();
+        
+        res.render('admin/users', {
+            title: 'User Management',
+            user: req.session.user,
+            currentUser: req.session.user, // For "current user" comparison in the template
+            users
+        });
+    } catch (error) {
+        console.error('Error getting users:', error);
+        req.flash('error_msg', 'An error occurred while retrieving users');
+        res.redirect('/admin/dashboard');
+    }
+};
+
+// User management - create user form
+exports.getCreateUser = (req, res) => {
+    res.render('admin/create-user', {
+        title: 'Create User',
+        user: req.session.user
+    });
+};
+
+// User management - process create user form
+exports.postCreateUser = async (req, res) => {
+    try {
+        // Check validation errors
+        const errors = validationResult(req);
+        
+        if (!errors.isEmpty()) {
+            return res.status(400).render('admin/create-user', {
+                title: 'Create User',
+                user: req.session.user,
+                errors: errors.array(),
+                formData: req.body
+            });
+        }
+        
+        const { username, email, password, first_name, last_name, role } = req.body;
+        
+        // Check if username already exists
+        const existingUsername = await User.findByUsername(username);
+        if (existingUsername) {
+            req.flash('error_msg', 'Username already exists');
+            return res.redirect('/admin/users/create');
+        }
+        
+        // Check if email already exists
+        const existingEmail = await User.findByEmail(email);
+        if (existingEmail) {
+            req.flash('error_msg', 'Email already exists');
+            return res.redirect('/admin/users/create');
+        }
+        
+        // Create user
+        const userData = {
+            username,
+            email,
+            password,
+            first_name,
+            last_name,
+            role
+        };
+        
+        const userId = await User.create(userData);
+        
+        // Create additional profile data based on role
+        if (role === 'student') {
+            const studentData = {
+                user_id: userId,
+                student_id: req.body.student_id || `STU${Math.floor(10000 + Math.random() * 90000)}`,
+                enrollment_date: new Date(),
+                current_semester: req.body.current_semester || 1
+            };
+            
+            await Student.create(studentData);
+        } else if (role === 'instructor') {
+            const instructorData = {
+                user_id: userId,
+                department: req.body.department || 'General',
+                office_location: req.body.office_location || null,
+                office_hours: req.body.office_hours || null
+            };
+            
+            await Instructor.create(instructorData);
+        }
+        
+        req.flash('success_msg', 'User created successfully');
+        res.redirect('/admin/users');
+    } catch (error) {
+        console.error('Error creating user:', error);
+        req.flash('error_msg', 'An error occurred while creating the user');
+        res.redirect('/admin/users/create');
+    }
+};
+
+// User management - edit user form
+exports.getEditUser = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const user = await User.findById(userId);
+        
+        if (!user) {
+            req.flash('error_msg', 'User not found');
+            return res.redirect('/admin/users');
+        }
+        
+        // Get additional profile data
+        let profileData = null;
+        
+        if (user.role === 'student') {
+            profileData = await Student.findByUserId(userId);
+        } else if (user.role === 'instructor') {
+            profileData = await Instructor.findByUserId(userId);
+        }
+        
+        res.render('admin/edit-user', {
+            title: 'Edit User',
+            user: req.session.user,
+            userData: user,
+            profileData
+        });
+    } catch (error) {
+        console.error('Error getting user for edit:', error);
+        req.flash('error_msg', 'An error occurred while retrieving the user');
+        res.redirect('/admin/users');
+    }
+};
+
+// User management - process edit user form
+exports.postEditUser = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const userData = await User.findById(userId);
+        
+        if (!userData) {
+            req.flash('error_msg', 'User not found');
+            return res.redirect('/admin/users');
+        }
+        
+        // Check validation errors
+        const errors = validationResult(req);
+        
+        if (!errors.isEmpty()) {
+            return res.status(400).render('admin/edit-user', {
+                title: 'Edit User',
+                user: req.session.user,
+                userData,
+                profileData: req.body,
+                errors: errors.array()
+            });
+        }
+        
+        // Update user
+        const userUpdateData = {
+            first_name: req.body.first_name,
+            last_name: req.body.last_name,
+            email: req.body.email,
+            is_active: req.body.is_active === 'true'
+        };
+        
+        await User.update(userId, userUpdateData);
+        
+        // Update additional profile data
+        if (userData.role === 'student') {
+            const studentData = {
+                date_of_birth: req.body.date_of_birth || null,
+                address: req.body.address || null,
+                phone: req.body.phone || null,
+                current_semester: req.body.current_semester || 1
+            };
+            
+            await Student.update(userId, studentData);
+        } else if (userData.role === 'instructor') {
+            const instructorData = {
+                department: req.body.department || 'General',
+                office_location: req.body.office_location || null,
+                office_hours: req.body.office_hours || null
+            };
+            
+            await Instructor.update(userId, instructorData);
+        }
+        
+        req.flash('success_msg', 'User updated successfully');
+        res.redirect('/admin/users');
+    } catch (error) {
+        console.error('Error updating user:', error);
+        req.flash('error_msg', 'An error occurred while updating the user');
+        res.redirect(`/admin/users/edit/${req.params.id}`);
+    }
+};
+
+// User management - delete user
+exports.deleteUser = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        
+        // Don't allow deleting yourself
+        if (userId === req.session.user.user_id.toString()) {
+            req.flash('error_msg', 'You cannot delete your own account');
+            return res.redirect('/admin/users');
+        }
+        
+        await User.delete(userId);
+        
+        req.flash('success_msg', 'User deleted successfully');
+        res.redirect('/admin/users');
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        req.flash('error_msg', 'An error occurred while deleting the user');
+        res.redirect('/admin/users');
+    }
+};
+
+// Course management - list all courses
+exports.getCourses = async (req, res) => {
+    try {
+        const courses = await Course.findAll();
+        
+        res.render('admin/courses', {
+            title: 'Course Management',
+            user: req.session.user,
+            courses
+        });
+    } catch (error) {
+        console.error('Error getting courses:', error);
+        req.flash('error_msg', 'An error occurred while retrieving courses');
+        res.redirect('/admin/dashboard');
+    }
+};
+
+// Course management - create course form
+exports.getCreateCourse = async (req, res) => {
+    try {
+        // Get all instructors for course assignment
+        const instructors = await User.findByRole('instructor');
+        
+        // Get all semesters
+        const [semesters] = await db.query('SELECT * FROM semesters ORDER BY start_date DESC');
+        
+        res.render('admin/create-course', {
+            title: 'Create Course',
+            user: req.session.user,
+            instructors,
+            semesters
+        });
+    } catch (error) {
+        console.error('Error getting data for course creation:', error);
+        req.flash('error_msg', 'An error occurred while preparing the course form');
+        res.redirect('/admin/courses');
+    }
+};
+
+// Course management - process create course form
+exports.postCreateCourse = async (req, res) => {
+    try {
+        // Check validation errors
+        const errors = validationResult(req);
+        
+        if (!errors.isEmpty()) {
+            // Retrieve data for form again
+            const instructors = await User.findByRole('instructor');
+            const [semesters] = await db.query('SELECT * FROM semesters ORDER BY start_date DESC');
+            
+            return res.status(400).render('admin/create-course', {
+                title: 'Create Course',
+                user: req.session.user,
+                instructors,
+                semesters,
+                errors: errors.array(),
+                formData: req.body
+            });
+        }
+        
+        const { course_code, title, description, credit_hours, semester_id, is_active, instructors: selectedInstructors } = req.body;
+        
+        // Create course
+        const courseData = {
+            course_code,
+            title,
+            description,
+            credit_hours,
+            semester_id,
+            is_active: is_active === 'true'
+        };
+        
+        const courseId = await Course.create(courseData);
+        
+        // Assign instructors if selected
+        if (selectedInstructors && selectedInstructors.length > 0) {
+            if (Array.isArray(selectedInstructors)) {
+                for (const instructorId of selectedInstructors) {
+                    await Course.assignInstructor(courseId, instructorId);
+                }
+            } else {
+                await Course.assignInstructor(courseId, selectedInstructors);
+            }
+        }
+        
+        req.flash('success_msg', 'Course created successfully');
+        res.redirect('/admin/courses');
+    } catch (error) {
+        console.error('Error creating course:', error);
+        req.flash('error_msg', 'An error occurred while creating the course');
+        res.redirect('/admin/courses/create');
+    }
+};
+
+// Course management - edit course form
+exports.getEditCourse = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const course = await Course.findById(courseId);
+        
+        if (!course) {
+            req.flash('error_msg', 'Course not found');
+            return res.redirect('/admin/courses');
+        }
+        
+        // Get assigned instructors
+        const assignedInstructors = await Course.getInstructors(courseId);
+        
+        // Get all instructors for selection
+        const instructors = await User.findByRole('instructor');
+        
+        // Get all semesters
+        const [semesters] = await db.query('SELECT * FROM semesters ORDER BY start_date DESC');
+        
+        res.render('admin/edit-course', {
+            title: 'Edit Course',
+            user: req.session.user,
+            course,
+            assignedInstructors,
+            instructors,
+            semesters
+        });
+    } catch (error) {
+        console.error('Error getting course for edit:', error);
+        req.flash('error_msg', 'An error occurred while retrieving the course');
+        res.redirect('/admin/courses');
+    }
+};
+
+// Course management - process edit course form
+exports.postEditCourse = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        
+        // Check validation errors
+        const errors = validationResult(req);
+        
+        if (!errors.isEmpty()) {
+            // Retrieve data for form again
+            const course = await Course.findById(courseId);
+            const assignedInstructors = await Course.getInstructors(courseId);
+            const instructors = await User.findByRole('instructor');
+            const [semesters] = await db.query('SELECT * FROM semesters ORDER BY start_date DESC');
+            
+            return res.status(400).render('admin/edit-course', {
+                title: 'Edit Course',
+                user: req.session.user,
+                course,
+                assignedInstructors,
+                instructors,
+                semesters,
+                errors: errors.array(),
+                formData: req.body
+            });
+        }
+        
+        const { course_code, title, description, credit_hours, semester_id, is_active, instructors: selectedInstructors } = req.body;
+        
+        // Update course
+        const courseData = {
+            course_code,
+            title,
+            description,
+            credit_hours,
+            semester_id,
+            is_active: is_active === 'true'
+        };
+        
+        await Course.update(courseId, courseData);
+        
+        // Update instructor assignments
+        
+        // First, get current instructors
+        const currentInstructors = await Course.getInstructors(courseId);
+        const currentInstructorIds = currentInstructors.map(i => i.user_id);
+        
+        // Create an array of selected instructor IDs (handle both single and multiple selections)
+        let newInstructorIds = [];
+        if (selectedInstructors) {
+            newInstructorIds = Array.isArray(selectedInstructors) 
+                ? selectedInstructors.map(id => parseInt(id)) 
+                : [parseInt(selectedInstructors)];
+        }
+        
+        // Remove instructors that are no longer assigned
+        for (const instructorId of currentInstructorIds) {
+            if (!newInstructorIds.includes(instructorId)) {
+                await Course.removeInstructor(courseId, instructorId);
+            }
+        }
+        
+        // Add new instructors
+        for (const instructorId of newInstructorIds) {
+            if (!currentInstructorIds.includes(instructorId)) {
+                await Course.assignInstructor(courseId, instructorId);
+            }
+        }
+        
+        req.flash('success_msg', 'Course updated successfully');
+        res.redirect('/admin/courses');
+    } catch (error) {
+        console.error('Error updating course:', error);
+        req.flash('error_msg', 'An error occurred while updating the course');
+        res.redirect(`/admin/courses/edit/${req.params.id}`);
+    }
+};
+
+// Course management - delete course
+exports.deleteCourse = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        
+        await Course.delete(courseId);
+        
+        req.flash('success_msg', 'Course deleted successfully');
+        res.redirect('/admin/courses');
+    } catch (error) {
+        console.error('Error deleting course:', error);
+        req.flash('error_msg', 'An error occurred while deleting the course');
+        res.redirect('/admin/courses');
+    }
+};
+
+// Announcement management - list all announcements
+exports.getAnnouncements = async (req, res) => {
+    try {
+        const announcements = await Announcement.findAll();
+        
+        res.render('admin/announcements', {
+            title: 'Announcement Management',
+            user: req.session.user,
+            announcements
+        });
+    } catch (error) {
+        console.error('Error getting announcements:', error);
+        req.flash('error_msg', 'An error occurred while retrieving announcements');
+        res.redirect('/admin/dashboard');
+    }
+};
+
+// Announcement management - create announcement form
+exports.getCreateAnnouncement = async (req, res) => {
+    try {
+        // Get courses for targeting announcement to a specific course
+        const courses = await Course.findAll({ is_active: true });
+        
+        res.render('admin/create-announcement', {
+            title: 'Create Announcement',
+            user: req.session.user,
+            courses
+        });
+    } catch (error) {
+        console.error('Error getting data for announcement creation:', error);
+        req.flash('error_msg', 'An error occurred while preparing the announcement form');
+        res.redirect('/admin/announcements');
+    }
+};
+
+// Announcement management - process create announcement form
+exports.postCreateAnnouncement = async (req, res) => {
+    try {
+        // Check validation errors
+        const errors = validationResult(req);
+        
+        if (!errors.isEmpty()) {
+            // Retrieve data for form again
+            const courses = await Course.findAll({ is_active: true });
+            
+            return res.status(400).render('admin/create-announcement', {
+                title: 'Create Announcement',
+                user: req.session.user,
+                courses,
+                errors: errors.array(),
+                formData: req.body
+            });
+        }
+        
+        const { title, content, target_type, course_id } = req.body;
+        
+        // Create announcement
+        const announcementData = {
+            title,
+            content,
+            created_by: req.session.user.user_id,
+            target_type,
+            course_id: target_type === 'course' ? course_id : null,
+            is_active: true
+        };
+        
+        await Announcement.create(announcementData);
+        
+        req.flash('success_msg', 'Announcement created successfully');
+        res.redirect('/admin/announcements');
+    } catch (error) {
+        console.error('Error creating announcement:', error);
+        req.flash('error_msg', 'An error occurred while creating the announcement');
+        res.redirect('/admin/announcements/create');
+    }
+};
+
+// Announcement management - edit announcement form
+exports.getEditAnnouncement = async (req, res) => {
+    try {
+        const announcementId = req.params.id;
+        const announcement = await Announcement.findById(announcementId);
+        
+        if (!announcement) {
+            req.flash('error_msg', 'Announcement not found');
+            return res.redirect('/admin/announcements');
+        }
+        
+        // Get courses for targeting announcement to a specific course
+        const courses = await Course.findAll({ is_active: true });
+        
+        res.render('admin/edit-announcement', {
+            title: 'Edit Announcement',
+            user: req.session.user,
+            announcement,
+            courses
+        });
+    } catch (error) {
+        console.error('Error getting announcement for edit:', error);
+        req.flash('error_msg', 'An error occurred while retrieving the announcement');
+        res.redirect('/admin/announcements');
+    }
+};
+
+// Announcement management - process edit announcement form
+exports.postEditAnnouncement = async (req, res) => {
+    try {
+        const announcementId = req.params.id;
+        
+        // Check validation errors
+        const errors = validationResult(req);
+        
+        if (!errors.isEmpty()) {
+            // Retrieve data for form again
+            const announcement = await Announcement.findById(announcementId);
+            const courses = await Course.findAll({ is_active: true });
+            
+            return res.status(400).render('admin/edit-announcement', {
+                title: 'Edit Announcement',
+                user: req.session.user,
+                announcement,
+                courses,
+                errors: errors.array(),
+                formData: req.body
+            });
+        }
+        
+        const { title, content, target_type, course_id, is_active } = req.body;
+        
+        // Update announcement
+        const announcementData = {
+            title,
+            content,
+            target_type,
+            course_id: target_type === 'course' ? course_id : null,
+            is_active: is_active === 'true'
+        };
+        
+        await Announcement.update(announcementId, announcementData);
+        
+        req.flash('success_msg', 'Announcement updated successfully');
+        res.redirect('/admin/announcements');
+    } catch (error) {
+        console.error('Error updating announcement:', error);
+        req.flash('error_msg', 'An error occurred while updating the announcement');
+        res.redirect(`/admin/announcements/edit/${req.params.id}`);
+    }
+};
+
+// Announcement management - delete announcement
+exports.deleteAnnouncement = async (req, res) => {
+    try {
+        const announcementId = req.params.id;
+        
+        await Announcement.delete(announcementId);
+        
+        req.flash('success_msg', 'Announcement deleted successfully');
+        res.redirect('/admin/announcements');
+    } catch (error) {
+        console.error('Error deleting announcement:', error);
+        req.flash('error_msg', 'An error occurred while deleting the announcement');
+        res.redirect('/admin/announcements');
+    }
+}; 

@@ -1,0 +1,252 @@
+<!-- Student Grades Page -->
+<div class="grades-page">
+    <!-- Page Header -->
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h1 class="dashboard-heading">
+                <i class="fas fa-chart-line me-2"></i> My Grades
+            </h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/student/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Grades</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="/student/gpa-calculator" class="btn btn-primary">
+                <i class="fas fa-calculator me-2"></i> GPA Calculator
+            </a>
+        </div>
+    </div>
+
+    <!-- GPA Overview -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card student-profile-summary">
+                <div class="card-body text-center">
+                    <h4>Current GPA</h4>
+                    <div class="student-gpa"><%= gpa && gpa.current ? gpa.current.toFixed(2) : '0.00' %></div>
+                    <hr>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h5><%= gpa && gpa.semester ? gpa.semester.toFixed(2) : '0.00' %></h5>
+                            <p class="text-muted">Semester GPA</p>
+                        </div>
+                        <div class="col-6">
+                            <h5><%= gpa && gpa.cumulative ? gpa.cumulative.toFixed(2) : '0.00' %></h5>
+                            <p class="text-muted">Cumulative GPA</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">GPA Trend</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="gpaChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Semester Grades -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-book me-2"></i> Current Semester Grades
+                <% if (currentSemester) { %>
+                    <span class="badge rounded-pill bg-secondary ms-2"><%= currentSemester.name %></span>
+                <% } %>
+            </h5>
+        </div>
+        <div class="card-body">
+            <% if (currentCourses && currentCourses.length > 0) { %>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Course Code</th>
+                                <th>Course Name</th>
+                                <th>Instructor</th>
+                                <th>Credits</th>
+                                <th>Current Grade</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% currentCourses.forEach(course => { %>
+                                <tr>
+                                    <td><%= course.course_code %></td>
+                                    <td>
+                                        <a href="/student/courses/<%= course.id %>">
+                                            <%= course.title %>
+                                        </a>
+                                    </td>
+                                    <td><%= course.instructor_name %></td>
+                                    <td><%= course.credit_hours %></td>
+                                    <td>
+                                        <% if (course.current_grade !== null) { %>
+                                            <span class="badge rounded-pill bg-<%= 
+                                                course.current_grade >= 90 ? 'success' : 
+                                                course.current_grade >= 80 ? 'primary' : 
+                                                course.current_grade >= 70 ? 'info' : 
+                                                course.current_grade >= 60 ? 'warning' : 
+                                                'danger' %>">
+                                                <%= course.current_grade %>%
+                                                (<%= 
+                                                    course.current_grade >= 90 ? 'A' : 
+                                                    course.current_grade >= 87 ? 'A-' : 
+                                                    course.current_grade >= 84 ? 'B+' : 
+                                                    course.current_grade >= 80 ? 'B' : 
+                                                    course.current_grade >= 77 ? 'B-' : 
+                                                    course.current_grade >= 74 ? 'C+' : 
+                                                    course.current_grade >= 70 ? 'C' : 
+                                                    course.current_grade >= 67 ? 'C-' : 
+                                                    course.current_grade >= 64 ? 'D+' : 
+                                                    course.current_grade >= 60 ? 'D' : 
+                                                    'F' %>)
+                                            </span>
+                                        <% } else { %>
+                                            <span class="badge rounded-pill bg-secondary">No Grade</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <span class="badge rounded-pill bg-info">In Progress</span>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } else { %>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> You are not enrolled in any courses for the current semester.
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Course Breakdown -->
+    <div class="accordion" id="semesterAccordion">
+        <% if(previousSemesters && previousSemesters.length > 0) { %>
+            <% previousSemesters.forEach((semester, index) => { %>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="semester<%= index %>Heading">
+                        <button class="accordion-button <%= index > 0 ? 'collapsed' : '' %>" type="button" data-bs-toggle="collapse" data-bs-target="#semester<%= index %>Collapse" aria-expanded="<%= index === 0 ? 'true' : 'false' %>" aria-controls="semester<%= index %>Collapse">
+                            <%= semester.name %> - Semester GPA: <strong><%= semester.gpa.toFixed(2) %></strong>
+                        </button>
+                    </h2>
+                    <div id="semester<%= index %>Collapse" class="accordion-collapse collapse <%= index === 0 ? 'show' : '' %>" aria-labelledby="semester<%= index %>Heading">
+                        <div class="accordion-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Course Code</th>
+                                            <th>Course Name</th>
+                                            <th>Instructor</th>
+                                            <th>Credits</th>
+                                            <th>Final Grade</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% semester.courses.forEach(course => { %>
+                                            <tr>
+                                                <td><%= course.course_code %></td>
+                                                <td><%= course.title %></td>
+                                                <td><%= course.instructor_name %></td>
+                                                <td><%= course.credit_hours %></td>
+                                                <td>
+                                                    <% if (course.final_grade !== null) { %>
+                                                        <span class="badge rounded-pill bg-<%= 
+                                                            course.final_grade >= 90 ? 'success' : 
+                                                            course.final_grade >= 80 ? 'primary' : 
+                                                            course.final_grade >= 70 ? 'info' : 
+                                                            course.final_grade >= 60 ? 'warning' : 
+                                                            'danger' %>">
+                                                            <%= course.final_grade %>%
+                                                            (<%= 
+                                                                course.final_grade >= 90 ? 'A' : 
+                                                                course.final_grade >= 87 ? 'A-' : 
+                                                                course.final_grade >= 84 ? 'B+' : 
+                                                                course.final_grade >= 80 ? 'B' : 
+                                                                course.final_grade >= 77 ? 'B-' : 
+                                                                course.final_grade >= 74 ? 'C+' : 
+                                                                course.final_grade >= 70 ? 'C' : 
+                                                                course.final_grade >= 67 ? 'C-' : 
+                                                                course.final_grade >= 64 ? 'D+' : 
+                                                                course.final_grade >= 60 ? 'D' : 
+                                                                'F' %>)
+                                                        </span>
+                                                    <% } else { %>
+                                                        <span class="badge rounded-pill bg-secondary">No Grade</span>
+                                                    <% } %>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <% }) %>
+        <% } else { %>
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i> You don't have any completed semesters yet.
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // GPA Chart
+        const gpaData = <%= JSON.stringify(gpaHistory) %>;
+        
+        if (gpaData && gpaData.length > 0) {
+            const ctx = document.getElementById('gpaChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: gpaData.map(item => item.semester_name),
+                    datasets: [{
+                        label: 'Semester GPA',
+                        data: gpaData.map(item => item.gpa),
+                        backgroundColor: '#99C65E',
+                        borderColor: '#212856',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#212856',
+                        pointRadius: 5,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: Math.max(0, Math.min(...gpaData.map(item => item.gpa)) - 0.5),
+                            max: Math.min(4, Math.max(...gpaData.map(item => item.gpa)) + 0.5)
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        } else {
+            document.getElementById('gpaChart').parentElement.innerHTML = '<div class="alert alert-info text-center">No GPA history available</div>';
+        }
+    });
+</script> 
