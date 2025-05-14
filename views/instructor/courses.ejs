@@ -73,7 +73,12 @@
         <% } else { %>
             <div class="col-12">
                 <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i> You are not assigned to any courses yet.
+                    <% if (locals.search || (locals.semester_id && locals.semester_id.trim() !== '')) { %>
+                        <i class="fas fa-search me-2"></i> No courses match your search criteria. 
+                        <a href="/instructor/courses" class="alert-link">Clear filters</a> to see all your courses.
+                    <% } else { %>
+                        <i class="fas fa-info-circle me-2"></i> You are not assigned to any courses yet.
+                    <% } %>
                 </div>
             </div>
         <% } %>

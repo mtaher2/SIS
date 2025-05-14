@@ -58,7 +58,7 @@
                             <div class="col-md-6 mb-3">
                                 <label for="phone" class="form-label">Phone Number</label>
                                 <input type="tel" class="form-control" id="phone" name="phone" 
-                                    value="<%= profile ? profile.phone : '' %>">
+                                    value="<%= profile && profile.phone ? profile.phone : '' %>">
                             </div>
                         </div>
 
@@ -89,12 +89,13 @@
                                 <div class="mb-3">
                                     <label for="profile_image" class="form-label">Upload New Profile Image</label>
                                     <input class="form-control" type="file" id="profile_image" name="profile_image" accept="image/*">
+                                    <div class="form-text">Maximum file size: 10MB. Supported formats: JPG, PNG, GIF</div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="text-center">
                                     <% if (user.profile_image) { %>
-                                        <img src="/storage/profile_images/<%= user.profile_image %>" alt="Current Profile Image" class="img-thumbnail" style="max-height: 150px;">
+                                        <img src="<%= user.profile_image %>" alt="Current Profile Image" class="img-thumbnail" style="max-height: 150px;">
                                     <% } else { %>
                                         <div class="bg-light p-4 text-center rounded">
                                             <i class="fas fa-user-circle fa-5x text-secondary"></i>

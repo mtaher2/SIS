@@ -154,6 +154,21 @@ class User {
         }
     }
 
+    // Update user profile image
+    static async updateProfileImage(userId, imagePath) {
+        try {
+            const [result] = await db.query(
+                'UPDATE users SET profile_image = ? WHERE user_id = ?',
+                [imagePath, userId]
+            );
+            
+            return result.affectedRows > 0;
+        } catch (error) {
+            console.error('Error updating profile image:', error);
+            throw error;
+        }
+    }
+
     // Get all users by role
     static async findByRole(role) {
         try {
@@ -182,6 +197,56 @@ class User {
             return rows;
         } catch (error) {
             console.error('Error finding all users:', error);
+            throw error;
+        }
+    }
+
+    // Search users with filters
+    static async search(filters = {}) {
+        try {
+            let query = `
+                SELECT users.*, roles.role_name as role 
+                FROM users 
+                JOIN roles ON users.role_id = roles.role_id
+            `;
+            
+            const whereConditions = [];
+            const queryParams = [];
+            
+            // Apply role filter
+            if (filters.role) {
+                whereConditions.push('roles.role_name = ?');
+                queryParams.push(filters.role);
+            }
+            
+            // Apply status filter
+            if (filters.status === 'active') {
+                whereConditions.push('users.is_active = ?');
+                queryParams.push(1);
+            } else if (filters.status === 'inactive') {
+                whereConditions.push('users.is_active = ?');
+                queryParams.push(0);
+            }
+            
+            // Apply search term
+            if (filters.search) {
+                whereConditions.push('(users.first_name LIKE ? OR users.last_name LIKE ? OR users.email LIKE ? OR users.username LIKE ?)');
+                const searchTerm = `%${filters.search}%`;
+                queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
+            }
+            
+            // Add WHERE clause if conditions exist
+            if (whereConditions.length > 0) {
+                query += ' WHERE ' + whereConditions.join(' AND ');
+            }
+            
+            // Add ordering
+            query += ' ORDER BY users.first_name, users.last_name';
+            
+            const [rows] = await db.query(query, queryParams);
+            return rows;
+        } catch (error) {
+            console.error('Error searching users:', error);
             throw error;
         }
     }

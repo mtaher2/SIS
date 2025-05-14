@@ -1,0 +1,192 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2"><%= assignment.title %></h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses">My Courses</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>"><%= course.title %></a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>/modules">Modules</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/modules/<%= module.module_id %>/assignments">Assignments</a></li>
+                    <li class="breadcrumb-item active"><%= assignment.title %></li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group">
+                <a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>/edit" class="btn btn-outline-primary">
+                    <i class="fas fa-edit me-1"></i> Edit Assignment
+                </a>
+                <a href="/instructor/modules/<%= module.module_id %>/assignments" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Assignments
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assignment Info Card -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i> Assignment Information</h5>
+            <div>
+                <% if (assignment.published) { %>
+                    <span class="badge bg-success me-2">Published</span>
+                <% } else { %>
+                    <span class="badge bg-secondary me-2">Draft</span>
+                <% } %>
+                <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#publishModal">
+                    <%= assignment.published ? 'Unpublish' : 'Publish' %>
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <h6 class="fw-bold">Instructions:</h6>
+                    <div class="mb-4"><%- assignment.instructions %></div>
+                    
+                    <h6 class="fw-bold">Submission Type:</h6>
+                    <div class="mb-3">
+                        <% if (assignment.submission_type === 'file') { %>
+                            <span class="badge bg-info">File Upload</span>
+                            <% if (assignment.allowed_file_types) { %>
+                                <small class="text-muted ms-2">Allowed file types: <%= assignment.allowed_file_types %></small>
+                            <% } %>
+                        <% } else if (assignment.submission_type === 'text') { %>
+                            <span class="badge bg-info">Text Entry</span>
+                        <% } else if (assignment.submission_type === 'url') { %>
+                            <span class="badge bg-info">Website URL</span>
+                        <% } else if (assignment.submission_type === 'media') { %>
+                            <span class="badge bg-info">Media Recording</span>
+                        <% } else if (assignment.submission_type === 'external') { %>
+                            <span class="badge bg-info">External Tool</span>
+                        <% } else if (assignment.submission_type === 'none') { %>
+                            <span class="badge bg-info">No Submission</span>
+                        <% } %>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <ul class="list-unstyled mb-0">
+                                <li class="mb-2"><strong>Points:</strong> <%= assignment.points_possible %></li>
+                                <% if (assignment.due_date) { %>
+                                    <li class="mb-2"><strong>Due Date:</strong> <%= new Date(assignment.due_date).toLocaleString() %></li>
+                                <% } %>
+                                <% if (assignment.available_from) { %>
+                                    <li class="mb-2"><strong>Available From:</strong> <%= new Date(assignment.available_from).toLocaleString() %></li>
+                                <% } %>
+                                <% if (assignment.available_until) { %>
+                                    <li class="mb-2"><strong>Available Until:</strong> <%= new Date(assignment.available_until).toLocaleString() %></li>
+                                <% } %>
+                                <li class="mb-2"><strong>Late Submissions:</strong> <%= assignment.allow_late_submissions ? 'Allowed' : 'Not Allowed' %></li>
+                                <% if (assignment.allow_late_submissions && assignment.late_submission_deduction > 0) { %>
+                                    <li><strong>Late Deduction:</strong> <%= assignment.late_submission_deduction %>%</li>
+                                <% } %>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Submissions Section -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-tasks me-2"></i> Student Submissions</h5>
+        </div>
+        <div class="card-body">
+            <% if (submissions && submissions.length > 0) { %>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Submission Date</th>
+                                <th>Status</th>
+                                <th>Grade</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% submissions.forEach(submission => { %>
+                                <tr>
+                                    <td><%= submission.student_name %></td>
+                                    <td>
+                                        <% if (submission.submission_date) { %>
+                                            <%= new Date(submission.submission_date).toLocaleString() %>
+                                            <% if (submission.late) { %>
+                                                <span class="badge bg-warning text-dark ms-1">Late</span>
+                                            <% } %>
+                                        <% } else { %>
+                                            Not submitted
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (submission.graded) { %>
+                                            <span class="badge bg-success">Graded</span>
+                                        <% } else if (submission.submission_date) { %>
+                                            <span class="badge bg-info">Submitted</span>
+                                        <% } else { %>
+                                            <span class="badge bg-secondary">Missing</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (submission.graded) { %>
+                                            <%= submission.score %> / <%= assignment.points_possible %>
+                                        <% } else { %>
+                                            -
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>/submissions/<%= submission.submission_id %>" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } else { %>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> No student submissions yet.
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<!-- Publish/Unpublish Modal -->
+<div class="modal fade" id="publishModal" tabindex="-1" aria-labelledby="publishModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="publishModalLabel"><%= assignment.published ? 'Unpublish' : 'Publish' %> Assignment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to <%= assignment.published ? 'unpublish' : 'publish' %> this assignment?</p>
+                <% if (!assignment.published) { %>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i> Publishing will make this assignment visible to students.
+                    </div>
+                <% } else { %>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i> Unpublishing will hide this assignment from students.
+                    </div>
+                <% } %>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>/toggle-publish" method="POST">
+                    <button type="submit" class="btn <%= assignment.published ? 'btn-warning' : 'btn-success' %>">
+                        <%= assignment.published ? 'Unpublish' : 'Publish' %>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div> 

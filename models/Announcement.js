@@ -123,12 +123,25 @@ class Announcement {
                 params.push(filters.is_active);
             }
             
+            // Add search filter
+            if (filters.search) {
+                conditions.push('(a.title LIKE ? OR a.content LIKE ? OR c.course_code LIKE ?)');
+                const searchTerm = `%${filters.search}%`;
+                params.push(searchTerm, searchTerm, searchTerm);
+            }
+            
             if (conditions.length > 0) {
                 query += ` WHERE ${conditions.join(' AND ')}`;
             }
             
             // Add ordering
             query += ' ORDER BY a.created_at DESC';
+            
+            // Add limit
+            if (filters.limit) {
+                query += ' LIMIT ?';
+                params.push(parseInt(filters.limit));
+            }
             
             const [rows] = await db.query(query, params);
             return rows;

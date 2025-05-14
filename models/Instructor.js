@@ -21,15 +21,17 @@ class Instructor {
     // Create a new instructor profile
     static async create(profileData) {
         try {
+            console.log('Creating new instructor profile with data:', profileData);
             const [result] = await db.query(
                 `INSERT INTO instructor_profiles 
-                (user_id, department, office_location, office_hours)
-                VALUES (?, ?, ?, ?)`,
+                (user_id, department, office_location, office_hours, phone)
+                VALUES (?, ?, ?, ?, ?)`,
                 [
                     profileData.user_id,
                     profileData.department,
                     profileData.office_location || null,
-                    profileData.office_hours || null
+                    profileData.office_hours || null,
+                    profileData.phone || null
                 ]
             );
             return result.insertId;
@@ -42,19 +44,42 @@ class Instructor {
     // Update instructor profile
     static async update(userId, profileData) {
         try {
+            console.log('Updating instructor profile for user ID:', userId);
+            console.log('Update data:', profileData);
+            
+            // First check if the instructor profile exists
+            const [existingProfile] = await db.query(
+                'SELECT * FROM instructor_profiles WHERE user_id = ?',
+                [userId]
+            );
+            
+            if (existingProfile.length === 0) {
+                console.log('No existing profile found, creating new one');
+                // If profile doesn't exist, create it
+                const profileWithUserId = {
+                    ...profileData,
+                    user_id: userId
+                };
+                return await this.create(profileWithUserId);
+            }
+            
+            // Update existing profile
             const [result] = await db.query(
                 `UPDATE instructor_profiles SET
                 department = ?,
                 office_location = ?,
-                office_hours = ?
+                office_hours = ?,
+                phone = ?
                 WHERE user_id = ?`,
                 [
                     profileData.department,
                     profileData.office_location || null,
                     profileData.office_hours || null,
+                    profileData.phone || null,
                     userId
                 ]
             );
+            console.log('Update result:', result);
             return result.affectedRows > 0;
         } catch (error) {
             console.error('Error updating instructor profile:', error);
@@ -95,19 +120,42 @@ class Instructor {
                 throw new Error('Instructor is not assigned to this course');
             }
             
-            // Get students
-            const [rows] = await db.query(
-                `SELECT u.user_id, u.first_name, u.last_name, u.email, u.username,
-                    e.enrollment_id, e.status, e.final_grade,
-                    sp.student_id
-                FROM enrollments e
-                JOIN users u ON e.student_id = u.user_id
-                JOIN student_profiles sp ON u.user_id = sp.user_id
-                WHERE e.course_id = ?
-                ORDER BY u.last_name, u.first_name`,
-                [courseId]
-            );
+            // Check if student_profiles table exists
+            let hasStudentProfiles = true;
+            try {
+                await db.query('SELECT 1 FROM student_profiles LIMIT 1');
+            } catch (err) {
+                if (err.code === 'ER_NO_SUCH_TABLE') {
+                    hasStudentProfiles = false;
+                }
+            }
             
+            // Get students
+            let query;
+            if (hasStudentProfiles) {
+                query = `
+                    SELECT u.user_id, u.first_name, u.last_name, u.email, u.username,
+                        e.enrollment_id, e.status, e.final_grade,
+                        sp.student_id
+                    FROM enrollments e
+                    JOIN users u ON e.student_id = u.user_id
+                    JOIN student_profiles sp ON u.user_id = sp.user_id
+                    WHERE e.course_id = ?
+                    ORDER BY u.last_name, u.first_name
+                `;
+            } else {
+                query = `
+                    SELECT u.user_id, u.first_name, u.last_name, u.email, u.username,
+                        e.enrollment_id, e.status, e.final_grade,
+                        CONCAT('STU', u.user_id) as student_id
+                    FROM enrollments e
+                    JOIN users u ON e.student_id = u.user_id
+                    WHERE e.course_id = ?
+                    ORDER BY u.last_name, u.first_name
+                `;
+            }
+            
+            const [rows] = await db.query(query, [courseId]);
             return rows;
         } catch (error) {
             console.error('Error getting course students:', error);
@@ -249,4 +297,4 @@ class Instructor {
     }
 }
 
-module.exports = Instructor; 
+module.exports = Instructor;

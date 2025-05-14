@@ -344,4 +344,79 @@ footer .text-center {
     color: var(--primary-color);
     text-align: center;
     margin-top: 20px;
+}
+
+/* Quill Editor File Attachments */
+.file-attachment {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    margin: 5px 0;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    color: #495057;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    max-width: 100%;
+    word-break: break-word;
+}
+
+.file-attachment:hover {
+    background-color: #e9ecef;
+    color: #212529;
+    text-decoration: none;
+}
+
+.file-attachment i {
+    margin-right: 5px;
+    font-size: 1.1em;
+}
+
+/* Specific file type colors */
+.file-attachment i.fa-file-pdf {
+    color: #e74c3c;
+}
+
+.file-attachment i.fa-file-word {
+    color: #2b579a;
+}
+
+.file-attachment i.fa-file-powerpoint {
+    color: #d24726;
+}
+
+.file-attachment i.fa-file-excel {
+    color: #217346;
+}
+
+.file-attachment i.fa-file-archive {
+    color: #f39c12;
+}
+
+/* YouTube video embeds styling */
+.embed-responsive {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.embed-responsive::before {
+    content: "";
+    display: block;
+    padding-top: 56.25%; /* 16:9 aspect ratio */
+}
+
+.embed-responsive-item,
+.embed-responsive iframe {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
 } 

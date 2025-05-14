@@ -10,16 +10,6 @@
                 </ol>
             </nav>
         </div>
-        <div class="col-md-4 text-end">
-            <div class="btn-group">
-                <a href="/instructor/courses/<%= course.course_id %>/add-material" class="btn btn-success">
-                    <i class="fas fa-file-upload me-1"></i> Add Material
-                </a>
-                <a href="/instructor/courses/<%= course.course_id %>/add-assignment" class="btn btn-primary">
-                    <i class="fas fa-tasks me-1"></i> Add Assignment
-                </a>
-            </div>
-        </div>
     </div>
 
     <div class="row">
@@ -52,138 +42,143 @@
                 </div>
             </div>
             
-            <!-- Course Materials -->
+            <!-- Modules -->
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center bg-primary text-white">
-                    <h5 class="mb-0"><i class="fas fa-book me-2"></i> Course Materials</h5>
-                    <a href="/instructor/courses/<%= course.course_id %>/add-material" class="btn btn-sm btn-light">
-                        <i class="fas fa-plus me-1"></i> Add Material
+                    <h5 class="mb-0"><i class="fas fa-cubes me-2"></i> Course Modules</h5>
+                    <a href="/instructor/courses/<%= course.course_id %>/modules" class="btn btn-sm btn-light">
+                        <i class="fas fa-th-list me-1"></i> Manage Modules
                     </a>
                 </div>
                 <div class="card-body">
-                    <% if (materials && materials.length > 0) { %>
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Title</th>
-                                        <th>Type</th>
-                                        <th>Date Added</th>
-                                        <th class="text-end">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <% materials.forEach(material => { %>
-                                        <tr>
-                                            <td>
-                                                <div class="fw-bold"><%= material.title %></div>
-                                                <div class="small text-muted"><%= material.description %></div>
-                                            </td>
-                                            <td>
-                                                <% if (material.material_type === 'file') { %>
-                                                    <span class="badge bg-info">File</span>
-                                                <% } else if (material.material_type === 'link') { %>
-                                                    <span class="badge bg-secondary">Link</span>
-                                                <% } else { %>
-                                                    <span class="badge bg-light text-dark">Other</span>
-                                                <% } %>
-                                            </td>
-                                            <td><%= new Date(material.created_at).toLocaleDateString() %></td>
-                                            <td>
-                                                <div class="d-flex justify-content-end">
-                                                    <% if (material.material_type === 'file' && material.file_path) { %>
-                                                        <a href="<%= material.file_path %>" class="btn btn-sm btn-primary me-1" title="Download" target="_blank">
-                                                            <i class="fas fa-download"></i>
-                                                        </a>
-                                                    <% } else if (material.material_type === 'link' && material.link_url) { %>
-                                                        <a href="<%= material.link_url %>" class="btn btn-sm btn-primary me-1" title="Open Link" target="_blank">
-                                                            <i class="fas fa-external-link-alt"></i>
-                                                        </a>
-                                                    <% } %>
-                                                    <button type="button" class="btn btn-sm btn-danger" title="Delete"
-                                                            onclick="confirmDeleteMaterial('<%= course.course_id %>', '<%= material.material_id %>', '<%= material.title %>')">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
+                    <% if (modules && modules.length > 0) { %>
+                        <div class="modules-list">
+                            <% modules.forEach((module, index) => { %>
+                                <div class="module-item card mb-3">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0">
+                                            <span class="badge bg-secondary me-2"><%= index + 1 %></span>
+                                            <%= module.title %>
+                                            <% if (!module.published) { %>
+                                                <span class="badge bg-warning text-dark">Unpublished</span>
+                                            <% } %>
+                                        </h5>
+                                        <div>
+                                            <a href="/instructor/modules/<%= module.module_id %>/pages" class="btn btn-sm btn-primary me-1" title="Pages">
+                                                <i class="fas fa-file-alt"></i>
+                                            </a>
+                                            <a href="/instructor/modules/<%= module.module_id %>/quizzes" class="btn btn-sm btn-info me-1" title="Quizzes">
+                                                <i class="fas fa-question-circle"></i>
+                                            </a>
+                                            <a href="/instructor/modules/<%= module.module_id %>/assignments" class="btn btn-sm btn-success" title="Assignments">
+                                                <i class="fas fa-tasks"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <% if (module.description) { %>
+                                            <p class="mb-3"><%= module.description %></p>
+                                        <% } %>
+                                        
+                                        <div class="row">
+                                            <!-- Pages summary -->
+                                            <div class="col-md-4">
+                                                <div class="card h-100">
+                                                    <div class="card-body">
+                                                        <h6><i class="fas fa-file-alt me-2"></i> Pages</h6>
+                                                        <% if (module.contents && module.contents.pages && module.contents.pages.length > 0) { %>
+                                                            <ul class="list-group list-group-flush">
+                                                                <% module.contents.pages.slice(0, 3).forEach(page => { %>
+                                                                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                                                        <span><%= page.title %></span>
+                                                                        <% if (!page.published) { %>
+                                                                            <span class="badge bg-secondary">Unpublished</span>
+                                                                        <% } %>
+                                                                    </li>
+                                                                <% }); %>
+                                                                <% if (module.contents.pages.length > 3) { %>
+                                                                    <li class="list-group-item text-center px-0">
+                                                                        <a href="/instructor/modules/<%= module.module_id %>/pages">
+                                                                            + <%= module.contents.pages.length - 3 %> more
+                                                                        </a>
+                                                                    </li>
+                                                                <% } %>
+                                                            </ul>
+                                                        <% } else { %>
+                                                            <p class="text-muted">No pages yet</p>
+                                                        <% } %>
+                                                    </div>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    <% }); %>
-                                </tbody>
-                            </table>
+                                            </div>
+                                            
+                                            <!-- Quizzes summary -->
+                                            <div class="col-md-4">
+                                                <div class="card h-100">
+                                                    <div class="card-body">
+                                                        <h6><i class="fas fa-question-circle me-2"></i> Quizzes</h6>
+                                                        <% if (module.contents && module.contents.quizzes && module.contents.quizzes.length > 0) { %>
+                                                            <ul class="list-group list-group-flush">
+                                                                <% module.contents.quizzes.slice(0, 3).forEach(quiz => { %>
+                                                                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                                                        <span><%= quiz.title %></span>
+                                                                        <% if (!quiz.published) { %>
+                                                                            <span class="badge bg-secondary">Unpublished</span>
+                                                                        <% } %>
+                                                                    </li>
+                                                                <% }); %>
+                                                                <% if (module.contents.quizzes.length > 3) { %>
+                                                                    <li class="list-group-item text-center px-0">
+                                                                        <a href="/instructor/modules/<%= module.module_id %>/quizzes">
+                                                                            + <%= module.contents.quizzes.length - 3 %> more
+                                                                        </a>
+                                                                    </li>
+                                                                <% } %>
+                                                            </ul>
+                                                        <% } else { %>
+                                                            <p class="text-muted">No quizzes yet</p>
+                                                        <% } %>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Assignments summary -->
+                                            <div class="col-md-4">
+                                                <div class="card h-100">
+                                                    <div class="card-body">
+                                                        <h6><i class="fas fa-tasks me-2"></i> Assignments</h6>
+                                                        <% if (module.contents && module.contents.assignments && module.contents.assignments.length > 0) { %>
+                                                            <ul class="list-group list-group-flush">
+                                                                <% module.contents.assignments.slice(0, 3).forEach(assignment => { %>
+                                                                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                                                        <span><%= assignment.title %></span>
+                                                                        <% if (!assignment.published) { %>
+                                                                            <span class="badge bg-secondary">Unpublished</span>
+                                                                        <% } %>
+                                                                    </li>
+                                                                <% }); %>
+                                                                <% if (module.contents.assignments.length > 3) { %>
+                                                                    <li class="list-group-item text-center px-0">
+                                                                        <a href="/instructor/modules/<%= module.module_id %>/assignments">
+                                                                            + <%= module.contents.assignments.length - 3 %> more
+                                                                        </a>
+                                                                    </li>
+                                                                <% } %>
+                                                            </ul>
+                                                        <% } else { %>
+                                                            <p class="text-muted">No assignments yet</p>
+                                                        <% } %>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% }); %>
                         </div>
                     <% } else { %>
                         <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i> No materials have been added to this course yet.
-                            <a href="/instructor/courses/<%= course.course_id %>/add-material">Add your first material</a>.
-                        </div>
-                    <% } %>
-                </div>
-            </div>
-            
-            <!-- Assignments -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center bg-primary text-white">
-                    <h5 class="mb-0"><i class="fas fa-tasks me-2"></i> Assignments</h5>
-                    <a href="/instructor/courses/<%= course.course_id %>/add-assignment" class="btn btn-sm btn-light">
-                        <i class="fas fa-plus me-1"></i> Add Assignment
-                    </a>
-                </div>
-                <div class="card-body">
-                    <% if (assignments && assignments.length > 0) { %>
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Title</th>
-                                        <th>Due Date</th>
-                                        <th>Points</th>
-                                        <th class="text-end">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <% assignments.forEach(assignment => { %>
-                                        <tr>
-                                            <td>
-                                                <div class="fw-bold"><%= assignment.title %></div>
-                                                <div class="small text-muted"><%= assignment.description ? assignment.description.substring(0, 100) + (assignment.description.length > 100 ? '...' : '') : '' %></div>
-                                            </td>
-                                            <td>
-                                                <%= new Date(assignment.due_date).toLocaleDateString() %>
-                                                <% 
-                                                    const now = new Date();
-                                                    const dueDate = new Date(assignment.due_date);
-                                                    const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-                                                %>
-                                                <% if (diffDays < 0) { %>
-                                                    <span class="badge bg-danger">Past Due</span>
-                                                <% } else if (diffDays <= 3) { %>
-                                                    <span class="badge bg-warning text-dark">Due Soon</span>
-                                                <% } %>
-                                            </td>
-                                            <td><%= assignment.max_points %> pts</td>
-                                            <td>
-                                                <div class="d-flex justify-content-end">
-                                                    <a href="/instructor/courses/<%= course.course_id %>/assignments/<%= assignment.assignment_id %>/grade" class="btn btn-sm btn-success me-1" title="Grade">
-                                                        <i class="fas fa-clipboard-check"></i>
-                                                    </a>
-                                                    <a href="/instructor/courses/<%= course.course_id %>/assignments/<%= assignment.assignment_id %>/edit" class="btn btn-sm btn-primary me-1" title="Edit">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                    <button type="button" class="btn btn-sm btn-danger" title="Delete"
-                                                            onclick="confirmDeleteAssignment('<%= course.course_id %>', '<%= assignment.assignment_id %>', '<%= assignment.title %>')">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <% }); %>
-                                </tbody>
-                            </table>
-                        </div>
-                    <% } else { %>
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i> No assignments have been created for this course yet.
-                            <a href="/instructor/courses/<%= course.course_id %>/add-assignment">Create your first assignment</a>.
+                            <i class="fas fa-info-circle me-2"></i> No modules have been created for this course yet.
+                            <a href="/instructor/courses/<%= course.course_id %>/modules">Create your first module</a>.
                         </div>
                     <% } %>
                 </div>
@@ -196,9 +191,14 @@
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-users me-2"></i> Students Enrolled</h5>
-                    <a href="/instructor/courses/<%= course.course_id %>/add-students" class="btn btn-sm btn-light">
-                        <i class="fas fa-user-plus me-1"></i> Add Students
-                    </a>
+                    <div>
+                        <a href="/instructor/courses/<%= course.course_id %>/students" class="btn btn-sm btn-light me-1">
+                            <i class="fas fa-users me-1"></i> Manage
+                        </a>
+                        <a href="/instructor/courses/<%= course.course_id %>/add-students" class="btn btn-sm btn-light">
+                            <i class="fas fa-user-plus me-1"></i> Add
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body">
                     <% if (students && students.length > 0) { %>
@@ -210,7 +210,9 @@
                                         <%= student.first_name %> <%= student.last_name %>
                                         <div class="text-muted small"><%= student.student_id || 'ID not available' %></div>
                                     </div>
-                                    <a href="/instructor/students/<%= student.user_id %>" class="btn btn-sm btn-outline-primary">View</a>
+                                    <% if (student.user_id) { %>
+                                        <a href="/instructor/students/<%= student.user_id %>" class="btn btn-sm btn-outline-primary">View</a>
+                                    <% } %>
                                 </div>
                             <% }); %>
                         </div>
@@ -228,17 +230,55 @@
                     <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i> Course Stats</h5>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex justify-content-between mb-3">
-                        <span>Materials:</span>
-                        <span class="badge bg-info"><%= materials ? materials.length : 0 %></span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-3">
-                        <span>Assignments:</span>
-                        <span class="badge bg-primary"><%= assignments ? assignments.length : 0 %></span>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Students:</span>
-                        <span class="badge bg-success"><%= students ? students.length : 0 %></span>
+                    <div class="row">
+                        <div class="col-6 col-md-6 mb-3 text-center">
+                            <div class="p-3 bg-light rounded">
+                                <h3 class="text-primary mb-0"><%= modules ? modules.length : 0 %></h3>
+                                <small class="text-muted">Modules</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-6 mb-3 text-center">
+                            <div class="p-3 bg-light rounded">
+                                <h3 class="text-info mb-0">
+                                    <% 
+                                        let quizCount = 0;
+                                        if (modules && modules.length > 0) {
+                                            modules.forEach(module => {
+                                                if (module.contents && module.contents.quizzes) {
+                                                    quizCount += module.contents.quizzes.length;
+                                                }
+                                            });
+                                        }
+                                    %>
+                                    <%= quizCount %>
+                                </h3>
+                                <small class="text-muted">Quizzes</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-6 mb-3 text-center">
+                            <div class="p-3 bg-light rounded">
+                                <h3 class="text-success mb-0">
+                                    <% 
+                                        let assignmentCount = 0;
+                                        if (modules && modules.length > 0) {
+                                            modules.forEach(module => {
+                                                if (module.contents && module.contents.assignments) {
+                                                    assignmentCount += module.contents.assignments.length;
+                                                }
+                                            });
+                                        }
+                                    %>
+                                    <%= assignmentCount %>
+                                </h3>
+                                <small class="text-muted">Assignments</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-6 mb-3 text-center">
+                            <div class="p-3 bg-light rounded">
+                                <h3 class="text-warning mb-0"><%= students ? students.length : 0 %></h3>
+                                <small class="text-muted">Students</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

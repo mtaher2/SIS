@@ -31,7 +31,15 @@
                     </li>
                     <% if (user) { %>
                     <li class="nav-item">
+                        <% if (user.role === 'admin') { %>
                         <a class="nav-link" href="/courses">Courses</a>
+                        <% } %>
+                        <% if (user.role === 'instructor') { %>
+                        <a class="nav-link" href="/instructor/courses">Courses</a>
+                        <% } %>
+                        <% if (user.role === 'student') { %>
+                        <a class="nav-link" href="/student/courses">Courses</a>
+                        <% } %>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/announcements">Announcements</a>
@@ -80,9 +88,6 @@
                         <li class="nav-item">
                             <a class="nav-link" href="/auth/login">Login</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/auth/register">Register</a>
-                        </li>
                     <% } %>
                 </ul>
             </div>
@@ -92,21 +97,21 @@
     <!-- Flash Messages -->
     <div class="container mt-3">
         <% if (typeof success_msg !== 'undefined' && success_msg.length > 0) { %>
-            <div class="alert alert-success alert-dismissible fade show">
+            <div class="alert alert-success alert-dismissible fade show flash-message">
                 <%= success_msg %>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         <% } %>
 
         <% if (typeof error_msg !== 'undefined' && error_msg.length > 0) { %>
-            <div class="alert alert-danger alert-dismissible fade show">
+            <div class="alert alert-danger alert-dismissible fade show flash-message">
                 <%= error_msg %>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         <% } %>
 
         <% if (typeof error !== 'undefined' && error.length > 0) { %>
-            <div class="alert alert-danger alert-dismissible fade show">
+            <div class="alert alert-danger alert-dismissible fade show flash-message">
                 <%= error %>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
@@ -141,7 +146,6 @@
                         <% } %>
                         <% if (!user) { %>
                         <li class="mb-2"><a href="/auth/login" class="text-white">Login</a></li>
-                        <li class="mb-2"><a href="/auth/register" class="text-white">Register</a></li>
                         <% } %>
                     </ul>
                 </div>
@@ -166,5 +170,27 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- Custom JS -->
     <script src="/js/main.js"></script>
+    
+    <!-- Auto-hide flash messages after 3 seconds -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const flashMessages = document.querySelectorAll('.flash-message');
+            
+            if (flashMessages.length > 0) {
+                flashMessages.forEach(function(message) {
+                    setTimeout(function() {
+                        // Fade out
+                        message.style.transition = 'opacity 0.5s ease';
+                        message.style.opacity = '0';
+                        
+                        // Remove from DOM after transition
+                        setTimeout(function() {
+                            message.style.display = 'none';
+                        }, 500);
+                    }, 3000);
+                });
+            }
+        });
+    </script>
 </body>
 </html> 

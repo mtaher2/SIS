@@ -18,6 +18,7 @@ const instructorRoutes = require('./routes/instructor');
 const studentRoutes = require('./routes/student');
 const courseRoutes = require('./routes/courses');
 const announcementRoutes = require('./routes/announcements');
+const apiRoutes = require('./routes/api');
 
 // Import auth middleware
 const { restrictAccess } = require('./utils/auth');
@@ -93,6 +94,7 @@ app.use('/instructor', instructorRoutes);
 app.use('/student', studentRoutes);
 app.use('/courses', courseRoutes);
 app.use('/announcements', announcementRoutes);
+app.use('/api', apiRoutes);
 
 // Home route
 app.get('/', (req, res) => {

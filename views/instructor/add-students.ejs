@@ -23,18 +23,6 @@
                 </div>
 
                 <div class="card-body">
-                    <% if (locals.success_msg) { %>
-                        <div class="alert alert-success">
-                            <%= success_msg %>
-                        </div>
-                    <% } %>
-                    
-                    <% if (locals.error_msg) { %>
-                        <div class="alert alert-danger">
-                            <%= error_msg %>
-                        </div>
-                    <% } %>
-
                     <!-- Search Students -->
                     <div class="card mb-4">
                         <div class="card-header">
@@ -74,7 +62,6 @@
                                                         </div>
                                                     </th>
                                                     <th>Name</th>
-                                                    <th>Student ID</th>
                                                     <th>Email</th>
                                                     <th>Current Courses</th>
                                                 </tr>
@@ -88,7 +75,6 @@
                                                             </div>
                                                         </td>
                                                         <td><%= student.first_name %> <%= student.last_name %></td>
-                                                        <td><%= student.student_id || 'N/A' %></td>
                                                         <td><%= student.email %></td>
                                                         <td><%= student.course_count || 0 %></td>
                                                     </tr>

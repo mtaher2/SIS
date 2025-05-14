@@ -29,6 +29,10 @@ router.post('/users/edit/:id', [
 ], adminController.postEditUser);
 router.delete('/users/delete/:id', adminController.deleteUser);
 
+// Admin reset user password route
+router.get('/users/reset-password/:id', adminController.getResetPassword);
+router.post('/users/reset-password/:id', adminController.postResetPassword);
+
 // Course management
 router.get('/courses', adminController.getCourses);
 router.get('/courses/create', adminController.getCreateCourse);
@@ -46,6 +50,11 @@ router.post('/courses/edit/:id', [
     check('semester_id', 'Semester is required').notEmpty()
 ], adminController.postEditCourse);
 router.delete('/courses/delete/:id', adminController.deleteCourse);
+
+// Course student management
+router.get('/courses/:id/students', adminController.getCourseStudents);
+router.post('/courses/:id/students/add', adminController.addStudentToCourse);
+router.post('/courses/:id/students/remove', adminController.removeStudentFromCourse);
 
 // Announcement management
 router.get('/announcements', adminController.getAnnouncements);

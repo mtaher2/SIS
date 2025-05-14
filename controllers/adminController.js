@@ -59,13 +59,26 @@ exports.getDashboard = async (req, res) => {
 // User management - list all users
 exports.getUsers = async (req, res) => {
     try {
-        const users = await User.findAll();
+        // Get search and filter parameters from query
+        const { search, role, status } = req.query;
+        
+        // Prepare filters object
+        const filters = {};
+        if (search) filters.search = search;
+        if (role) filters.role = role;
+        if (status) filters.status = status;
+        
+        // Fetch users with filters
+        const users = await User.search(filters);
         
         res.render('admin/users', {
             title: 'User Management',
             user: req.session.user,
             currentUser: req.session.user, // For "current user" comparison in the template
-            users
+            users,
+            search,
+            role,
+            status
         });
     } catch (error) {
         console.error('Error getting users:', error);
@@ -276,12 +289,27 @@ exports.deleteUser = async (req, res) => {
 // Course management - list all courses
 exports.getCourses = async (req, res) => {
     try {
-        const courses = await Course.findAll();
+        const { search, semester_id } = req.query;
+        const filters = {};
+        
+        // Add semester filter if provided
+        if (semester_id) {
+            filters.semester_id = semester_id;
+        }
+        
+        // Get all semesters for the filter dropdown
+        const [semesters] = await db.query('SELECT * FROM semesters ORDER BY start_date DESC');
+        
+        // Get courses with search and filters
+        const courses = await Course.search(search, filters);
         
         res.render('admin/courses', {
             title: 'Course Management',
             user: req.session.user,
-            courses
+            courses,
+            semesters,
+            search,
+            semester_id
         });
     } catch (error) {
         console.error('Error getting courses:', error);
@@ -499,12 +527,26 @@ exports.deleteCourse = async (req, res) => {
 // Announcement management - list all announcements
 exports.getAnnouncements = async (req, res) => {
     try {
-        const announcements = await Announcement.findAll();
+        // Get search and filter parameters from query
+        const { search, target_type, status } = req.query;
+        
+        // Prepare filters object
+        const filters = {};
+        if (search) filters.search = search;
+        if (target_type) filters.target_type = target_type;
+        if (status === 'active') filters.is_active = true;
+        if (status === 'inactive') filters.is_active = false;
+        
+        // Fetch announcements with filters
+        const announcements = await Announcement.findAll(filters);
         
         res.render('admin/announcements', {
             title: 'Announcement Management',
             user: req.session.user,
-            announcements
+            announcements,
+            search,
+            target_type,
+            status
         });
     } catch (error) {
         console.error('Error getting announcements:', error);
@@ -658,5 +700,171 @@ exports.deleteAnnouncement = async (req, res) => {
         console.error('Error deleting announcement:', error);
         req.flash('error_msg', 'An error occurred while deleting the announcement');
         res.redirect('/admin/announcements');
+    }
+};
+
+// User management - reset password form
+exports.getResetPassword = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const userData = await User.findById(userId);
+        
+        if (!userData) {
+            req.flash('error_msg', 'User not found');
+            return res.redirect('/admin/users');
+        }
+        
+        res.render('admin/reset-password', {
+            title: 'Reset User Password',
+            user: req.session.user,
+            userData
+        });
+    } catch (error) {
+        console.error('Error getting user for password reset:', error);
+        req.flash('error_msg', 'An error occurred while retrieving the user');
+        res.redirect('/admin/users');
+    }
+};
+
+// User management - process reset password form
+exports.postResetPassword = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const userData = await User.findById(userId);
+        
+        if (!userData) {
+            req.flash('error_msg', 'User not found');
+            return res.redirect('/admin/users');
+        }
+        
+        const { new_password, confirm_password } = req.body;
+        
+        // Validate password and confirmation
+        if (!new_password || new_password.length < 6) {
+            req.flash('error_msg', 'Password must be at least 6 characters');
+            return res.redirect(`/admin/users/reset-password/${userId}`);
+        }
+        
+        if (new_password !== confirm_password) {
+            req.flash('error_msg', 'Passwords do not match');
+            return res.redirect(`/admin/users/reset-password/${userId}`);
+        }
+        
+        // Update the password
+        await User.updatePassword(userId, new_password);
+        
+        req.flash('success_msg', `Password has been reset successfully for ${userData.first_name} ${userData.last_name}`);
+        res.redirect('/admin/users');
+    } catch (error) {
+        console.error('Error resetting user password:', error);
+        req.flash('error_msg', 'An error occurred while resetting the password');
+        res.redirect(`/admin/users/reset-password/${req.params.id}`);
+    }
+};
+
+// Course student management - view students in a course
+exports.getCourseStudents = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const { search, status } = req.query;
+        
+        // Get course details
+        const course = await Course.findById(courseId);
+        
+        if (!course) {
+            req.flash('error_msg', 'Course not found');
+            return res.redirect('/admin/courses');
+        }
+        
+        // Prepare filters
+        const filters = {};
+        if (search) filters.search = search;
+        if (status) filters.status = status;
+        
+        // Get enrolled students
+        let students = [];
+        try {
+            students = await Course.getEnrolledStudents(courseId, filters);
+        } catch (error) {
+            console.error('Error getting enrolled students:', error);
+            req.flash('error_msg', 'There was an issue loading enrolled students');
+            // Continue with empty students array
+        }
+        
+        // Get all students for adding new ones
+        let allStudents = [];
+        try {
+            allStudents = await User.findByRole('student');
+        } catch (error) {
+            console.error('Error getting student users:', error);
+            // Continue with empty allStudents array
+        }
+        
+        // Filter out already enrolled students (with active status)
+        const enrolledStudentIds = students
+            .filter(s => s.status === 'active')
+            .map(s => s.user_id);
+        
+        const availableStudents = allStudents.filter(s => !enrolledStudentIds.includes(s.user_id));
+        
+        res.render('admin/course-students', {
+            title: `Students - ${course.title}`,
+            user: req.session.user,
+            course,
+            students,
+            availableStudents,
+            search,
+            status
+        });
+    } catch (error) {
+        console.error('Error getting course students:', error);
+        req.flash('error_msg', 'An error occurred while retrieving the course students');
+        res.redirect('/admin/courses');
+    }
+};
+
+// Course student management - add student to course
+exports.addStudentToCourse = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const { student_id } = req.body;
+        
+        if (!student_id) {
+            req.flash('error_msg', 'Student ID is required');
+            return res.redirect(`/admin/courses/${courseId}/students`);
+        }
+        
+        // Enroll student
+        await Course.enrollStudent(courseId, student_id);
+        
+        req.flash('success_msg', 'Student added to course successfully');
+        res.redirect(`/admin/courses/${courseId}/students`);
+    } catch (error) {
+        console.error('Error adding student to course:', error);
+        req.flash('error_msg', 'An error occurred while adding the student to the course');
+        res.redirect(`/admin/courses/${req.params.id}/students`);
+    }
+};
+
+// Course student management - remove student from course
+exports.removeStudentFromCourse = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const { student_id } = req.body;
+        
+        if (!student_id) {
+            req.flash('error_msg', 'Student ID is required');
+            return res.redirect(`/admin/courses/${courseId}/students`);
+        }
+        
+        // Drop student
+        await Course.dropStudent(courseId, student_id);
+        
+        req.flash('success_msg', 'Student removed from course successfully');
+        res.redirect(`/admin/courses/${courseId}/students`);
+    } catch (error) {
+        console.error('Error removing student from course:', error);
+        req.flash('error_msg', 'An error occurred while removing the student from the course');
+        res.redirect(`/admin/courses/${req.params.id}/students`);
     }
 }; 

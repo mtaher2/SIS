@@ -1,0 +1,325 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">Course Modules</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses">My Courses</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>"><%= course.title %></a></li>
+                    <li class="breadcrumb-item active">Modules</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModuleModal">
+                <i class="fas fa-plus-circle me-1"></i> Add Module
+            </button>
+        </div>
+    </div>
+
+    <!-- Module Management Section -->
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-cubes me-2"></i> Module Management</h5>
+        </div>
+        <div class="card-body">
+            <p class="mb-3">
+                Modules help you organize course content and control the flow of material. 
+                You can reorder modules by dragging them into the desired position.
+            </p>
+
+            <% if (modules && modules.length > 0) { %>
+                <div class="module-list" id="sortableModules">
+                    <% modules.forEach((module, index) => { %>
+                        <div class="card mb-3 module-card" data-module-id="<%= module.module_id %>">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="module-drag-handle me-2"><i class="fas fa-grip-vertical"></i></span>
+                                    <span class="badge rounded-pill bg-secondary me-2"><%= index + 1 %></span>
+                                    <span class="h5 mb-0"><%= module.title %></span>
+                                    <% if (!module.published) { %>
+                                        <span class="badge bg-warning text-dark ms-2">Unpublished</span>
+                                    <% } %>
+                                </div>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <button type="button" class="dropdown-item edit-module" data-module-id="<%= module.module_id %>" 
+                                                    data-title="<%= module.title %>" data-description="<%= module.description || '' %>" 
+                                                    data-published="<%= module.published %>">
+                                                <i class="fas fa-edit me-2"></i> Edit
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <form action="/instructor/courses/<%= course.course_id %>/modules/<%= module.module_id %>/toggle-publish" method="POST">
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="fas <%= module.published ? 'fa-eye-slash' : 'fa-eye' %> me-2"></i>
+                                                    <%= module.published ? 'Unpublish' : 'Publish' %>
+                                                </button>
+                                            </form>
+                                        </li>
+                                        <li>
+                                            <button type="button" class="dropdown-item text-danger delete-module" 
+                                                    data-module-id="<%= module.module_id %>" data-title="<%= module.title %>">
+                                                <i class="fas fa-trash me-2"></i> Delete
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <% if (module.description) { %>
+                                    <p class="mb-3"><%= module.description %></p>
+                                <% } %>
+                                
+                                <div class="row content-stats">
+                                    <div class="col-md-4">
+                                        <a href="/instructor/modules/<%= module.module_id %>/pages" class="d-flex justify-content-between align-items-center p-2 rounded bg-light hover-highlight">
+                                            <span><i class="fas fa-file-alt me-2"></i> Pages</span>
+                                            <span class="badge rounded-pill bg-primary">
+                                                <%= module.contents && module.contents.pages ? module.contents.pages.length : 0 %>
+                                            </span>
+                                        </a>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <a href="/instructor/modules/<%= module.module_id %>/quizzes" class="d-flex justify-content-between align-items-center p-2 rounded bg-light hover-highlight">
+                                            <span><i class="fas fa-question-circle me-2"></i> Quizzes</span>
+                                            <span class="badge rounded-pill bg-info">
+                                                <%= module.contents && module.contents.quizzes ? module.contents.quizzes.length : 0 %>
+                                            </span>
+                                        </a>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <a href="/instructor/modules/<%= module.module_id %>/assignments" class="d-flex justify-content-between align-items-center p-2 rounded bg-light hover-highlight">
+                                            <span><i class="fas fa-tasks me-2"></i> Assignments</span>
+                                            <span class="badge rounded-pill bg-success">
+                                                <%= module.contents && module.contents.assignments ? module.contents.assignments.length : 0 %>
+                                            </span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } else { %>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> No modules have been created for this course yet.
+                    Click the "Add Module" button to create your first module.
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Add Module Modal -->
+    <div class="modal fade" id="addModuleModal" tabindex="-1" aria-labelledby="addModuleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addModuleModalLabel">Add New Module</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="/instructor/courses/<%= course.course_id %>/modules" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Module Title</label>
+                            <input type="text" class="form-control" id="title" name="title" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description (Optional)</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="true" id="published" name="published">
+                            <label class="form-check-label" for="published">
+                                Publish module immediately
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create Module</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Module Modal -->
+    <div class="modal fade" id="editModuleModal" tabindex="-1" aria-labelledby="editModuleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editModuleModalLabel">Edit Module</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="editModuleForm" action="" method="POST">
+                    <input type="hidden" name="_method" value="PUT">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="editTitle" class="form-label">Module Title</label>
+                            <input type="text" class="form-control" id="editTitle" name="title" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editDescription" class="form-label">Description (Optional)</label>
+                            <textarea class="form-control" id="editDescription" name="description" rows="3"></textarea>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="true" id="editPublished" name="published">
+                            <label class="form-check-label" for="editPublished">
+                                Publish module
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModuleModal" tabindex="-1" aria-labelledby="deleteModuleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModuleModalLabel">Confirm Deletion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the module "<span id="deleteModuleTitle"></span>"?</p>
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i> This will permanently delete all pages, quizzes, and assignments in this module. This action cannot be undone.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form id="deleteModuleForm" action="" method="POST">
+                        <input type="hidden" name="_method" value="DELETE">
+                        <button type="submit" class="btn btn-danger">Delete Module</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include Sortable.js for drag and drop functionality -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize sortable for modules
+        const sortableList = document.getElementById('sortableModules');
+        if (sortableList) {
+            new Sortable(sortableList, {
+                animation: 150,
+                handle: '.module-drag-handle',
+                ghostClass: 'module-ghost',
+                onEnd: function() {
+                    // Get the new order of modules
+                    const positions = [];
+                    document.querySelectorAll('.module-card').forEach((module, index) => {
+                        positions.push({
+                            module_id: module.dataset.moduleId,
+                            position: index
+                        });
+                    });
+                    
+                    // Update the module positions via AJAX
+                    fetch('/instructor/courses/<%= course.course_id %>/modules/reorder', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ positions })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update the visual order (module numbers)
+                            document.querySelectorAll('.module-card').forEach((module, index) => {
+                                module.querySelector('.badge.rounded-pill.bg-secondary').textContent = index + 1;
+                            });
+                        } else {
+                            console.error('Error updating module order:', data.message);
+                            // Optionally show an error message to the user
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating module order:', error);
+                    });
+                }
+            });
+        }
+        
+        // Set up edit module buttons
+        document.querySelectorAll('.edit-module').forEach(button => {
+            button.addEventListener('click', function() {
+                const moduleId = this.dataset.moduleId;
+                const title = this.dataset.title;
+                const description = this.dataset.description;
+                const published = this.dataset.published === 'true';
+                
+                document.getElementById('editTitle').value = title;
+                document.getElementById('editDescription').value = description;
+                document.getElementById('editPublished').checked = published;
+                
+                const form = document.getElementById('editModuleForm');
+                form.action = `/instructor/courses/<%= course.course_id %>/modules/${moduleId}?_method=PUT`;
+                
+                const editModal = new bootstrap.Modal(document.getElementById('editModuleModal'));
+                editModal.show();
+            });
+        });
+        
+        // Set up delete module buttons
+        document.querySelectorAll('.delete-module').forEach(button => {
+            button.addEventListener('click', function() {
+                const moduleId = this.dataset.moduleId;
+                const title = this.dataset.title;
+                
+                document.getElementById('deleteModuleTitle').textContent = title;
+                
+                const form = document.getElementById('deleteModuleForm');
+                form.action = `/instructor/courses/<%= course.course_id %>/modules/${moduleId}`;
+                
+                const deleteModal = new bootstrap.Modal(document.getElementById('deleteModuleModal'));
+                deleteModal.show();
+            });
+        });
+    });
+</script>
+
+<style>
+    .module-drag-handle {
+        cursor: move;
+        color: #6c757d;
+    }
+    
+    .module-ghost {
+        opacity: 0.5;
+        background: #c8ebfb;
+    }
+    
+    .hover-highlight:hover {
+        background-color: #e9ecef !important;
+        transition: background-color 0.2s;
+    }
+    
+    .content-stats a {
+        text-decoration: none;
+        color: inherit;
+        transition: transform 0.1s;
+    }
+    
+    .content-stats a:hover {
+        transform: translateY(-2px);
+    }
+</style> 

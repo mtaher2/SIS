@@ -3,10 +3,9 @@
     <p class="lead">A comprehensive platform to manage academic operations for students, instructors, and administrators.</p>
     <hr class="my-4">
     <% if (!user) { %>
-        <p>Please login or register to access the system features.</p>
+        <p>Please login to access the system features.</p>
         <div>
             <a href="/auth/login" class="btn btn-primary btn-lg me-2">Login</a>
-            <a href="/auth/register" class="btn btn-outline-primary btn-lg">Register</a>
         </div>
     <% } else { %>
         <p>Welcome back, <%= user.first_name %>!</p>

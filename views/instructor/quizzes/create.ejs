@@ -1,0 +1,133 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">Create Quiz</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses">My Courses</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>"><%= course.title %></a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>/modules">Modules</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/modules/<%= module.module_id %>/quizzes">Quizzes</a></li>
+                    <li class="breadcrumb-item active">Create</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="/instructor/modules/<%= module.module_id %>/quizzes" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Back to Quizzes
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-question-circle me-2"></i> Create Quiz</h5>
+        </div>
+        <div class="card-body">
+            <form action="/instructor/modules/<%= module.module_id %>/quizzes" method="POST">
+                <!-- Quiz Details -->
+                <div class="mb-3">
+                    <label for="title" class="form-label">Quiz Title</label>
+                    <input type="text" class="form-control" id="title" name="title" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    <div class="form-text">Provide instructions and details about this quiz.</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="points_possible" class="form-label">Points Possible</label>
+                        <input type="number" class="form-control" id="points_possible" name="points_possible" min="0" value="100">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="time_limit" class="form-label">Time Limit (minutes)</label>
+                        <input type="number" class="form-control" id="time_limit" name="time_limit" min="0">
+                        <div class="form-text">Leave blank for no time limit.</div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="allowed_attempts" class="form-label">Allowed Attempts</label>
+                        <input type="number" class="form-control" id="allowed_attempts" name="allowed_attempts" min="1" value="1">
+                        <div class="form-text">Maximum number of attempts allowed per student.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="grade_release_option" class="form-label">Grade Release</label>
+                        <select class="form-select" id="grade_release_option" name="grade_release_option">
+                            <option value="immediate">Immediate - After submission</option>
+                            <option value="after_last_attempt">After last attempt</option>
+                            <option value="after_due_date">After due date</option>
+                            <option value="manual">Manual - Instructor releases</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="start_date" class="form-label">Available From</label>
+                        <input type="datetime-local" class="form-control" id="start_date" name="start_date">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="end_date" class="form-label">Available Until</label>
+                        <input type="datetime-local" class="form-control" id="end_date" name="end_date">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="shuffle_questions" name="shuffle_questions" value="true">
+                        <label class="form-check-label" for="shuffle_questions">
+                            Shuffle questions for each student
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="shuffle_answers" name="shuffle_answers" value="true">
+                        <label class="form-check-label" for="shuffle_answers">
+                            Shuffle answer choices for multiple choice questions
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="show_correct_answers" name="show_correct_answers" value="true" checked>
+                        <label class="form-check-label" for="show_correct_answers">
+                            Show correct answers to students after quiz
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="published" name="published" value="true">
+                        <label class="form-check-label" for="published">
+                            Publish quiz immediately
+                        </label>
+                        <div class="form-text">If unchecked, the quiz will be saved as a draft.</div>
+                    </div>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Create Quiz
+                    </button>
+                    <a href="/instructor/modules/<%= module.module_id %>/quizzes" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="alert alert-info mt-4">
+        <i class="fas fa-info-circle me-2"></i> After creating the quiz, you will be able to add questions.
+    </div>
+</div> 
