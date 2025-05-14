@@ -1,0 +1,164 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">Edit Quiz</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses">My Courses</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>"><%= course.title %></a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>/modules">Modules</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/modules/<%= module.module_id %>/quizzes">Quizzes</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/modules/<%= module.module_id %>/quizzes/<%= quiz.quiz_id %>"><%= quiz.title %></a></li>
+                    <li class="breadcrumb-item active">Edit</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="/instructor/modules/<%= module.module_id %>/quizzes/<%= quiz.quiz_id %>" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Back to Quiz
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-edit me-2"></i> Edit Quiz</h5>
+        </div>
+        <div class="card-body">
+            <form action="/instructor/modules/<%= module.module_id %>/quizzes/<%= quiz.quiz_id %>?_method=PUT" method="POST">
+                <!-- Quiz Details -->
+                <div class="mb-3">
+                    <label for="title" class="form-label">Quiz Title</label>
+                    <input type="text" class="form-control" id="title" name="title" value="<%= quiz.title %>" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3"><%= quiz.description %></textarea>
+                    <div class="form-text">Provide instructions and details about this quiz.</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="points_possible" class="form-label">Points Possible</label>
+                        <input type="number" class="form-control" id="points_possible" name="points_possible" min="0" value="<%= quiz.points_possible %>">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="time_limit" class="form-label">Time Limit (minutes)</label>
+                        <input type="number" class="form-control" id="time_limit" name="time_limit" min="0" value="<%= quiz.time_limit %>">
+                        <div class="form-text">Leave blank for no time limit.</div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="allowed_attempts" class="form-label">Allowed Attempts</label>
+                        <input type="number" class="form-control" id="allowed_attempts" name="allowed_attempts" min="1" value="<%= quiz.allowed_attempts %>">
+                        <div class="form-text">Maximum number of attempts allowed per student.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="grade_release_option" class="form-label">Grade Release</label>
+                        <select class="form-select" id="grade_release_option" name="grade_release_option">
+                            <option value="immediate" <%= quiz.grade_release_option === 'immediate' ? 'selected' : '' %>>Immediate - After submission</option>
+                            <option value="after_last_attempt" <%= quiz.grade_release_option === 'after_last_attempt' ? 'selected' : '' %>>After last attempt</option>
+                            <option value="after_due_date" <%= quiz.grade_release_option === 'after_due_date' ? 'selected' : '' %>>After due date</option>
+                            <option value="manual" <%= quiz.grade_release_option === 'manual' ? 'selected' : '' %>>Manual - Instructor releases</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="start_date" class="form-label">Available From</label>
+                        <input type="datetime-local" class="form-control" id="start_date" name="start_date" value="<%= quiz.start_date ? new Date(quiz.start_date).toISOString().slice(0, 16) : '' %>">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="end_date" class="form-label">Available Until</label>
+                        <input type="datetime-local" class="form-control" id="end_date" name="end_date" value="<%= quiz.end_date ? new Date(quiz.end_date).toISOString().slice(0, 16) : '' %>">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="shuffle_questions" name="shuffle_questions" value="true" <%= quiz.shuffle_questions ? 'checked' : '' %>>
+                        <label class="form-check-label" for="shuffle_questions">
+                            Shuffle questions for each student
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="shuffle_answers" name="shuffle_answers" value="true" <%= quiz.shuffle_answers ? 'checked' : '' %>>
+                        <label class="form-check-label" for="shuffle_answers">
+                            Shuffle answer choices for multiple choice questions
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="show_correct_answers" name="show_correct_answers" value="true" <%= quiz.show_correct_answers ? 'checked' : '' %>>
+                        <label class="form-check-label" for="show_correct_answers">
+                            Show correct answers to students after quiz
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="published" name="published" value="true" <%= quiz.published ? 'checked' : '' %>>
+                        <label class="form-check-label" for="published">
+                            Published
+                        </label>
+                        <div class="form-text">If unchecked, the quiz will be saved as a draft.</div>
+                    </div>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Save Changes
+                    </button>
+                    <a href="/instructor/modules/<%= module.module_id %>/quizzes/<%= quiz.quiz_id %>" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-between mt-4">
+        <a href="/instructor/modules/<%= module.module_id %>/quizzes/<%= quiz.quiz_id %>/questions" class="btn btn-outline-primary">
+            <i class="fas fa-question-circle me-1"></i> Manage Questions
+        </a>
+        
+        <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteQuizModal">
+            <i class="fas fa-trash me-1"></i> Delete Quiz
+        </button>
+    </div>
+</div>
+
+<!-- Delete Quiz Modal -->
+<div class="modal fade" id="deleteQuizModal" tabindex="-1" aria-labelledby="deleteQuizModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteQuizModalLabel">Delete Quiz</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i> Warning: This action cannot be undone.
+                </div>
+                <p>Are you sure you want to delete this quiz? This will permanently remove the quiz and all associated questions and student attempts.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="/instructor/modules/<%= module.module_id %>/quizzes/<%= quiz.quiz_id %>?_method=DELETE" method="POST">
+                    <button type="submit" class="btn btn-danger">Delete Quiz</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div> 

@@ -42,6 +42,56 @@ exports.getDashboard = async (req, res) => {
         // Get upcoming assignments
         const upcomingAssignments = [];
         
+        // Get upcoming assignments and quizzes from all instructor's courses
+        if (courses && courses.length > 0) {
+            // Get all course IDs
+            const courseIds = courses.map(course => course.course_id);
+            
+            try {
+                // Fetch upcoming assignments (due in the next 14 days)
+                const [assignmentRows] = await db.query(
+                    `SELECT a.*, c.title as course_name, c.course_code, m.title as module_title, 'assignment' as type
+                    FROM enhanced_assignments a
+                    JOIN modules m ON a.module_id = m.module_id
+                    JOIN courses c ON m.course_id = c.course_id
+                    WHERE m.course_id IN (?) 
+                    AND a.due_date IS NOT NULL
+                    AND a.due_date > NOW()
+                    AND a.due_date < DATE_ADD(NOW(), INTERVAL 14 DAY)
+                    ORDER BY a.due_date ASC
+                    LIMIT 10`,
+                    [courseIds]
+                );
+                
+                // Fetch upcoming quizzes using end_date (due in the next 14 days)
+                const [quizRows] = await db.query(
+                    `SELECT q.*, q.quiz_id as id, c.title as course_name, c.course_code, m.title as module_title, 'quiz' as type, q.end_date as due_date
+                    FROM quizzes q
+                    JOIN modules m ON q.module_id = m.module_id
+                    JOIN courses c ON m.course_id = c.course_id
+                    WHERE m.course_id IN (?) 
+                    AND q.end_date IS NOT NULL
+                    AND q.end_date > NOW()
+                    AND q.end_date < DATE_ADD(NOW(), INTERVAL 14 DAY)
+                    ORDER BY q.end_date ASC
+                    LIMIT 10`,
+                    [courseIds]
+                );
+                
+                // Combine and sort by due date
+                upcomingAssignments.push(...assignmentRows, ...quizRows);
+                upcomingAssignments.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+                
+                // Limit to 10 items
+                if (upcomingAssignments.length > 10) {
+                    upcomingAssignments.length = 10;
+                }
+            } catch (error) {
+                console.error('Error fetching upcoming deadlines:', error);
+                // Continue with empty upcomingAssignments array
+            }
+        }
+        
         res.render('instructor/dashboard', {
             title: 'Instructor Dashboard',
             user: req.session.user,
@@ -64,10 +114,42 @@ exports.getProfile = async (req, res) => {
         const instructorId = req.session.user.user_id;
         const profile = await Instructor.findByUserId(instructorId);
         
+        // Get assigned courses count
+        let courseCount = 0;
+        let studentCount = 0;
+        
+        try {
+            // Get instructor's courses
+            const courses = await Instructor.getAssignedCourses(instructorId);
+            courseCount = courses ? courses.length : 0;
+            
+            // Count total students across all courses
+            if (courses && courses.length > 0) {
+                const studentCounts = await Promise.all(
+                    courses.map(async (course) => {
+                        try {
+                            const students = await Instructor.getCourseStudents(course.course_id, instructorId);
+                            return students ? students.length : 0;
+                        } catch (error) {
+                            console.error('Error getting students for course:', error);
+                            return 0;
+                        }
+                    })
+                );
+                
+                studentCount = studentCounts.reduce((sum, count) => sum + count, 0);
+            }
+        } catch (error) {
+            console.error('Error calculating course and student counts:', error);
+            // Continue with default values of 0
+        }
+        
         res.render('instructor/profile', {
             title: 'My Profile',
             user: req.session.user,
-            profile
+            profile,
+            courseCount,
+            studentCount
         });
     } catch (error) {
         console.error('Error getting instructor profile:', error);
@@ -98,15 +180,61 @@ exports.getUpdateProfile = async (req, res) => {
 exports.postUpdateProfile = async (req, res) => {
     try {
         const instructorId = req.session.user.user_id;
+        console.log('Updating profile for instructor ID:', instructorId);
+        console.log('Form data received:', req.body);
         
-        // Update profile
+        // Validate input
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            console.log('Validation errors:', errors.array());
+            const profile = await Instructor.findByUserId(instructorId);
+            return res.render('instructor/update-profile', {
+                title: 'Update Profile',
+                user: req.session.user,
+                profile,
+                errors: errors.array(),
+                formData: req.body
+            });
+        }
+        
+        // First, check if instructor profile exists
+        const existingProfile = await Instructor.findByUserId(instructorId);
+        console.log('Existing profile:', existingProfile);
+        
+        // Update or create profile
         const profileData = {
             department: req.body.department,
             office_location: req.body.office_location,
-            office_hours: req.body.office_hours
+            office_hours: req.body.office_hours,
+            phone: req.body.phone // Add phone field
         };
+        console.log('Profile data to save:', profileData);
         
-        await Instructor.update(instructorId, profileData);
+        let result;
+        if (existingProfile) {
+            result = await Instructor.update(instructorId, profileData);
+            console.log('Update result:', result);
+        } else {
+            // If no profile exists, create one
+            profileData.user_id = instructorId;
+            result = await Instructor.create(profileData);
+            console.log('Create result:', result);
+        }
+        
+        // Handle profile image upload if provided
+        if (req.file) {
+            console.log('Processing profile image upload:', req.file);
+            
+            // Get the relative path for storage
+            const relativePath = req.file.path.replace(/^.*[\\\/]public[\\\/]/, '/');
+            
+            // Update user profile image in the database
+            const User = require('../models/User');
+            await User.updateProfileImage(instructorId, relativePath);
+            
+            // Update session data
+            req.session.user.profile_image = relativePath;
+        }
         
         req.flash('success_msg', 'Profile updated successfully');
         res.redirect('/instructor/profile');
@@ -121,12 +249,56 @@ exports.postUpdateProfile = async (req, res) => {
 exports.getCourses = async (req, res) => {
     try {
         const instructorId = req.session.user.user_id;
-        const courses = await Instructor.getAssignedCourses(instructorId);
+        const { search, semester_id } = req.query;
+        
+        // Get all instructor's courses
+        let courses = await Instructor.getAssignedCourses(instructorId);
+        
+        // Get all semesters for the filter dropdown
+        const [semesters] = await db.query('SELECT * FROM semesters ORDER BY start_date DESC');
+        
+        // Filter by semester if provided
+        if (semester_id && semester_id.trim() !== '') {
+            courses = courses.filter(course => course.semester_id == semester_id);
+        }
+        
+        // Apply search filter if provided
+        if (search && search.trim() !== '') {
+            const searchTerm = search.toLowerCase().trim();
+            courses = courses.filter(course => 
+                course.title.toLowerCase().includes(searchTerm) || 
+                course.course_code.toLowerCase().includes(searchTerm) ||
+                (course.description && course.description.toLowerCase().includes(searchTerm))
+            );
+        }
+        
+        // Add student count to each course
+        if (courses && courses.length > 0) {
+            // Process courses in parallel
+            courses = await Promise.all(courses.map(async (course) => {
+                try {
+                    const students = await Instructor.getCourseStudents(course.course_id, instructorId);
+                    return {
+                        ...course,
+                        student_count: students ? students.length : 0
+                    };
+                } catch (error) {
+                    console.error(`Error getting students for course ${course.course_id}:`, error);
+                    return {
+                        ...course,
+                        student_count: 0
+                    };
+                }
+            }));
+        }
         
         res.render('instructor/courses', {
             title: 'My Courses',
             user: req.session.user,
-            courses
+            courses,
+            semesters,
+            search,
+            semester_id
         });
     } catch (error) {
         console.error('Error getting instructor courses:', error);
@@ -154,13 +326,47 @@ exports.getCourse = async (req, res) => {
         const course = await Course.findById(courseId);
         
         // Get students enrolled in this course
-        const students = await Instructor.getCourseStudents(courseId, instructorId);
+        let students = [];
+        try {
+            students = await Instructor.getCourseStudents(courseId, instructorId);
+        } catch (error) {
+            console.error('Error getting course students:', error);
+            req.flash('error_msg', 'There was an issue loading enrolled students');
+            // Continue with empty students array
+        }
         
         // Get course materials
-        const materials = await Course.getMaterials(courseId);
+        let materials = [];
+        try {
+            materials = await Course.getMaterials(courseId);
+        } catch (error) {
+            console.error('Error getting course materials:', error);
+            // Continue with empty materials array
+        }
         
         // Get assignments
-        const assignments = await Course.getAssignments(courseId);
+        let assignments = [];
+        try {
+            assignments = await Course.getAssignments(courseId);
+        } catch (error) {
+            console.error('Error getting course assignments:', error);
+            // Continue with empty assignments array
+        }
+        
+        // Get modules
+        let modules = [];
+        try {
+            const Module = require('../models/Module');
+            modules = await Module.findByCourse(courseId);
+            
+            // For each module, get content summary
+            for (const module of modules) {
+                module.contents = await Module.getContents(module.module_id);
+            }
+        } catch (error) {
+            console.error('Error getting course modules:', error);
+            // Continue with empty modules array
+        }
         
         res.render('instructor/course-details', {
             title: course.title,
@@ -168,7 +374,8 @@ exports.getCourse = async (req, res) => {
             course,
             students,
             materials,
-            assignments
+            assignments,
+            modules
         });
     } catch (error) {
         console.error('Error getting course details:', error);
@@ -519,5 +726,188 @@ exports.postGradeAssignment = async (req, res) => {
         console.error('Error recording grades:', error);
         req.flash('error_msg', 'An error occurred while recording grades');
         res.redirect(`/instructor/courses/${req.params.courseId}/assignments/${req.params.assignmentId}/grade`);
+    }
+};
+
+// Course student management - view students in a course
+exports.getCourseStudents = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const instructorId = req.session.user.user_id;
+        const { search, status } = req.query;
+        
+        // Get course details
+        const course = await Course.findById(courseId);
+        
+        if (!course) {
+            req.flash('error_msg', 'Course not found');
+            return res.redirect('/instructor/courses');
+        }
+        
+        // Check if instructor is assigned to this course
+        const [instructorCheck] = await db.query(
+            'SELECT * FROM course_instructors WHERE course_id = ? AND instructor_id = ?',
+            [courseId, instructorId]
+        );
+        
+        if (instructorCheck.length === 0) {
+            req.flash('error_msg', 'You are not authorized to manage students for this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        // Get enrolled students
+        const students = await Instructor.getCourseStudents(courseId, instructorId);
+        
+        res.render('instructor/course-students', {
+            title: `Students - ${course.title}`,
+            user: req.session.user,
+            course,
+            students
+        });
+    } catch (error) {
+        console.error('Error getting course students:', error);
+        req.flash('error_msg', 'An error occurred while retrieving the course students');
+        res.redirect('/instructor/courses');
+    }
+};
+
+// Course student management - view add students form
+exports.getAddStudents = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const instructorId = req.session.user.user_id;
+        const { search } = req.query; // Get search parameter from query
+        
+        // Get course details
+        const course = await Course.findById(courseId);
+        
+        if (!course) {
+            req.flash('error_msg', 'Course not found');
+            return res.redirect('/instructor/courses');
+        }
+        
+        // Check if instructor is assigned to this course
+        const [instructorCheck] = await db.query(
+            'SELECT * FROM course_instructors WHERE course_id = ? AND instructor_id = ?',
+            [courseId, instructorId]
+        );
+        
+        if (instructorCheck.length === 0) {
+            req.flash('error_msg', 'You are not authorized to manage students for this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        // Get enrolled students
+        const students = await Instructor.getCourseStudents(courseId, instructorId);
+        
+        // Get all students for adding new ones
+        let allStudents = [];
+        
+        // If search term is provided, use the User.search method to filter students
+        if (search && search.trim() !== '') {
+            allStudents = await User.search({
+                role: 'student',
+                search: search.trim()
+            });
+        } else {
+            allStudents = await User.findByRole('student');
+        }
+        
+        // Filter out already enrolled students (with active status)
+        const enrolledStudentIds = students
+            .filter(s => s.status === 'active')
+            .map(s => s.user_id);
+        
+        const availableStudents = allStudents.filter(s => !enrolledStudentIds.includes(s.user_id));
+        
+        res.render('instructor/add-students', {
+            title: `Add Students - ${course.title}`,
+            user: req.session.user,
+            course,
+            availableStudents,
+            search // Pass search parameter to the view
+        });
+    } catch (error) {
+        console.error('Error loading add students form:', error);
+        req.flash('error_msg', 'An error occurred while loading the add students form');
+        res.redirect(`/instructor/courses/${req.params.id}/students`);
+    }
+};
+
+// Course student management - process add students form
+exports.postAddStudents = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const instructorId = req.session.user.user_id;
+        const { student_ids } = req.body;
+        
+        // Check if instructor is assigned to this course
+        const [instructorCheck] = await db.query(
+            'SELECT * FROM course_instructors WHERE course_id = ? AND instructor_id = ?',
+            [courseId, instructorId]
+        );
+        
+        if (instructorCheck.length === 0) {
+            req.flash('error_msg', 'You are not authorized to manage students for this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        if (!student_ids || student_ids.length === 0) {
+            req.flash('error_msg', 'Please select at least one student to add');
+            return res.redirect(`/instructor/courses/${courseId}/add-students`);
+        }
+        
+        // Enroll students
+        let addedCount = 0;
+        
+        // Handle both array and single value
+        const studentIdList = Array.isArray(student_ids) ? student_ids : [student_ids];
+        
+        for (const studentId of studentIdList) {
+            try {
+                await Course.enrollStudent(courseId, studentId);
+                addedCount++;
+            } catch (error) {
+                console.error(`Error enrolling student ${studentId}:`, error);
+                // Continue with next student
+            }
+        }
+        
+        req.flash('success_msg', `${addedCount} student(s) added to course successfully`);
+        res.redirect(`/instructor/courses/${courseId}/students`);
+    } catch (error) {
+        console.error('Error adding students to course:', error);
+        req.flash('error_msg', 'An error occurred while adding students to the course');
+        res.redirect(`/instructor/courses/${req.params.id}/add-students`);
+    }
+};
+
+// Course student management - remove student from course
+exports.removeStudentFromCourse = async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        const studentId = req.params.studentId;
+        const instructorId = req.session.user.user_id;
+        
+        // Check if instructor is assigned to this course
+        const [instructorCheck] = await db.query(
+            'SELECT * FROM course_instructors WHERE course_id = ? AND instructor_id = ?',
+            [courseId, instructorId]
+        );
+        
+        if (instructorCheck.length === 0) {
+            req.flash('error_msg', 'You are not authorized to manage students for this course');
+            return res.redirect('/instructor/courses');
+        }
+        
+        // Drop student
+        await Course.dropStudent(courseId, studentId);
+        
+        req.flash('success_msg', 'Student removed from course successfully');
+        res.redirect(`/instructor/courses/${courseId}/students`);
+    } catch (error) {
+        console.error('Error removing student from course:', error);
+        req.flash('error_msg', 'An error occurred while removing the student from the course');
+        res.redirect(`/instructor/courses/${req.params.id}/students`);
     }
 }; 

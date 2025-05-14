@@ -28,7 +28,7 @@
                     <div class="text-center mb-4">
                         <div class="avatar avatar-xl mx-auto">
                             <% if (user.profile_image) { %>
-                                <img src="/storage/profile_images/<%= user.profile_image %>" alt="Profile Image" class="img-fluid rounded-circle">
+                                <img src="<%= user.profile_image %>" alt="Profile Image" class="img-fluid rounded-circle">
                             <% } else { %>
                                 <div class="avatar-initial rounded-circle bg-light text-dark">
                                     <%= user.first_name.charAt(0) %><%= user.last_name.charAt(0) %>
@@ -102,7 +102,7 @@
                             <div class="card border-0 bg-light">
                                 <div class="card-body">
                                     <h6 class="text-muted mb-2">Assigned Courses</h6>
-                                    <h4><%= locals.courseCount || 'N/A' %></h4>
+                                    <h4><%= locals.courseCount !== undefined ? courseCount : 'N/A' %></h4>
                                 </div>
                             </div>
                         </div>
@@ -110,7 +110,7 @@
                             <div class="card border-0 bg-light">
                                 <div class="card-body">
                                     <h6 class="text-muted mb-2">Total Students</h6>
-                                    <h4><%= locals.studentCount || 'N/A' %></h4>
+                                    <h4><%= locals.studentCount !== undefined ? studentCount : 'N/A' %></h4>
                                 </div>
                             </div>
                         </div>

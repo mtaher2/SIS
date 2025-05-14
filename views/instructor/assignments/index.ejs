@@ -1,0 +1,140 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">Module Assignments</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses">My Courses</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>"><%= course.title %></a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>/modules">Modules</a></li>
+                    <li class="breadcrumb-item active">Assignments</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="/instructor/modules/<%= module.module_id %>/assignments/create" class="btn btn-primary">
+                <i class="fas fa-plus-circle me-1"></i> Create Assignment
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-tasks me-2"></i> Assignments - <%= module.title %></h5>
+        </div>
+        <div class="card-body">
+            <% if (assignments && assignments.length > 0) { %>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Due Date</th>
+                                <th>Points</th>
+                                <th>Status</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% assignments.forEach(assignment => { %>
+                                <tr>
+                                    <td>
+                                        <a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>">
+                                            <%= assignment.title %>
+                                        </a>
+                                        <% if (assignment.instructions) { %>
+                                            <div class="small text-muted"><%= assignment.instructions.substring(0, 100).replace(/<[^>]*>/g, '') %><%= assignment.instructions.length > 100 ? '...' : '' %></div>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (assignment.due_date) { %>
+                                            <%= new Date(assignment.due_date).toLocaleDateString() %>
+                                            <% 
+                                                const now = new Date();
+                                                const dueDate = new Date(assignment.due_date);
+                                                const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+                                            %>
+                                            <% if (diffDays < 0) { %>
+                                                <span class="badge bg-danger">Past Due</span>
+                                            <% } else if (diffDays <= 3) { %>
+                                                <span class="badge bg-warning text-dark">Due Soon</span>
+                                            <% } %>
+                                        <% } else { %>
+                                            <span class="text-muted">No due date</span>
+                                        <% } %>
+                                    </td>
+                                    <td><%= assignment.points_possible %> pts</td>
+                                    <td>
+                                        <% if (assignment.published) { %>
+                                            <span class="badge bg-success">Published</span>
+                                        <% } else { %>
+                                            <span class="badge bg-warning text-dark">Unpublished</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex justify-content-end">
+                                            <a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>" class="btn btn-sm btn-primary me-1" title="View">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>/edit" class="btn btn-sm btn-warning me-1" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>/submissions" class="btn btn-sm btn-info me-1" title="Submissions">
+                                                <i class="fas fa-clipboard-check"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-danger" title="Delete" 
+                                                    onclick="confirmDeleteAssignment('<%= module.module_id %>', '<%= assignment.assignment_id %>', '<%= assignment.title %>')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } else { %>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> No assignments have been created for this module yet.
+                    <a href="/instructor/modules/<%= module.module_id %>/assignments/create">Create your first assignment</a>.
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteAssignmentModal" tabindex="-1" aria-labelledby="deleteAssignmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteAssignmentModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the assignment "<span id="assignmentTitle"></span>"?</p>
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i> This action will delete all student submissions. This action cannot be undone.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteAssignmentForm" action="" method="POST">
+                    <input type="hidden" name="_method" value="DELETE">
+                    <button type="submit" class="btn btn-danger">Delete Assignment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmDeleteAssignment(moduleId, assignmentId, title) {
+        document.getElementById('assignmentTitle').textContent = title;
+        document.getElementById('deleteAssignmentForm').action = `/instructor/modules/${moduleId}/assignments/${assignmentId}`;
+        
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteAssignmentModal'));
+        deleteModal.show();
+    }
+</script> 

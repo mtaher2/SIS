@@ -28,13 +28,19 @@
                     <div class="text-center mb-3">
                         <div class="profile-img">
                             <% if (user.profile_image) { %>
-                                <img src="/storage/profile_images/<%= user.profile_image %>" alt="Profile Image" class="img-fluid rounded-circle">
+                                <% 
+                                    let imgSrc = user.profile_image;
+                                    if (!imgSrc.startsWith('/')) {
+                                        imgSrc = `/storage/profile_images/${imgSrc.split('/').pop()}`;
+                                    }
+                                %>
+                                <img src="<%= imgSrc %>" alt="Profile Image" class="img-fluid rounded-circle">
                             <% } else { %>
                                 <i class="fas fa-user-circle"></i>
                             <% } %>
                         </div>
                         <h3><%= user.first_name %> <%= user.last_name %></h3>
-                        <p class="text-muted"><%= user.department || 'Department not set' %></p>
+                        <p class="text-muted"><%= profile && profile.department ? profile.department : 'Department not set' %></p>
                     </div>
                     <div class="d-grid gap-2">
                         <a href="/instructor/profile" class="btn btn-primary">
@@ -215,7 +221,8 @@
                             <thead>
                                 <tr>
                                     <th>Course</th>
-                                    <th>Assignment</th>
+                                    <th>Type</th>
+                                    <th>Title</th>
                                     <th>Due Date</th>
                                     <th>Actions</th>
                                 </tr>
@@ -223,8 +230,9 @@
                             <tbody>
                                 <% upcomingAssignments.forEach(assignment => { %>
                                     <tr>
-                                        <td><%= assignment.course_code %></td>
-                                        <td><%= assignment.title %></td>
+                                        <td><strong><%= assignment.course_name || assignment.course_code || 'Unknown Course' %></strong></td>
+                                        <td><span class="badge <%= assignment.type === 'quiz' ? 'bg-info' : 'bg-primary' %>"><%= assignment.type === 'quiz' ? 'Quiz' : 'Assignment' %></span></td>
+                                        <td><%= assignment.title || 'Untitled' %></td>
                                         <td>
                                             <% 
                                                 const dueDate = new Date(assignment.due_date);
@@ -240,9 +248,15 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <a href="/instructor/courses/<%= assignment.course_id %>/assignments/<%= assignment.id %>/grade" class="btn btn-sm btn-primary">
-                                                <i class="fas fa-check-square"></i> Grade
-                                            </a>
+                                            <% if(assignment.type === 'quiz') { %>
+                                                <a href="/instructor/courses/<%= assignment.course_id %>/quizzes/<%= assignment.id || assignment.quiz_id %>/results" class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-chart-bar"></i> Results
+                                                </a>
+                                            <% } else { %>
+                                                <a href="/instructor/courses/<%= assignment.course_id %>/assignments/<%= assignment.id || assignment.assignment_id %>/grade" class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-check-square"></i> Grade
+                                                </a>
+                                            <% } %>
                                         </td>
                                     </tr>
                                 <% }) %>
@@ -254,6 +268,25 @@
                         <i class="fas fa-info-circle me-2"></i> No upcoming assignments or deadlines.
                     </div>
                 <% } %>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Management -->
+    <div class="mt-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-user-cog me-2"></i> Account Management</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <a href="/auth/change-password" class="list-group-item list-group-item-action">
+                        <i class="fas fa-key me-2"></i> Change Password
+                    </a>
+                    <a href="/auth/forgot-password" class="list-group-item list-group-item-action">
+                        <i class="fas fa-unlock-alt me-2"></i> Reset Password
+                    </a>
+                </div>
             </div>
         </div>
     </div>
