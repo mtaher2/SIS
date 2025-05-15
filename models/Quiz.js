@@ -1,4 +1,5 @@
 const db = require('../db');
+const pool = require('../db/pool');
 
 class Quiz {
     // Find quiz by ID
@@ -8,7 +9,7 @@ class Quiz {
                 'SELECT * FROM quizzes WHERE quiz_id = ?',
                 [quizId]
             );
-            return rows.length ? rows[0] : null;
+            return rows[0] || null;
         } catch (error) {
             console.error('Error finding quiz by ID:', error);
             throw error;
@@ -19,7 +20,12 @@ class Quiz {
     static async findByModule(moduleId) {
         try {
             const [rows] = await db.query(
-                'SELECT * FROM quizzes WHERE module_id = ? ORDER BY created_at',
+                `SELECT q.*, 
+                    (SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = q.quiz_id) as question_count,
+                    (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.quiz_id) as attempt_count
+                FROM quizzes q 
+                WHERE module_id = ? 
+                ORDER BY created_at DESC`,
                 [moduleId]
             );
             return rows;
@@ -36,8 +42,10 @@ class Quiz {
                 `INSERT INTO quizzes 
                 (module_id, title, description, time_limit, allowed_attempts, 
                 shuffle_questions, shuffle_answers, start_date, end_date, 
-                published, created_by, points_possible, grade_release_option, show_correct_answers) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                published, created_by, points_possible, passing_score,
+                show_question_points, allow_question_feedback, 
+                grade_release_option, show_correct_answers) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     quizData.module_id,
                     quizData.title,
@@ -51,6 +59,9 @@ class Quiz {
                     quizData.published || false,
                     quizData.created_by,
                     quizData.points_possible || 0,
+                    quizData.passing_score || null,
+                    quizData.show_question_points !== undefined ? quizData.show_question_points : true,
+                    quizData.allow_question_feedback !== undefined ? quizData.allow_question_feedback : true,
                     quizData.grade_release_option || 'immediate',
                     quizData.show_correct_answers !== undefined ? quizData.show_correct_answers : true
                 ]
@@ -67,7 +78,7 @@ class Quiz {
     static async update(quizId, quizData) {
         try {
             const [result] = await db.query(
-                `UPDATE quizzes SET
+                `UPDATE quizzes SET 
                 title = ?,
                 description = ?,
                 time_limit = ?,
@@ -78,8 +89,12 @@ class Quiz {
                 end_date = ?,
                 published = ?,
                 points_possible = ?,
+                passing_score = ?,
+                show_question_points = ?,
+                allow_question_feedback = ?,
                 grade_release_option = ?,
-                show_correct_answers = ?
+                show_correct_answers = ?,
+                updated_at = NOW()
                 WHERE quiz_id = ?`,
                 [
                     quizData.title,
@@ -90,8 +105,11 @@ class Quiz {
                     quizData.shuffle_answers || false,
                     quizData.start_date || null,
                     quizData.end_date || null,
-                    quizData.published !== undefined ? quizData.published : false,
+                    quizData.published || false,
                     quizData.points_possible || 0,
+                    quizData.passing_score || null,
+                    quizData.show_question_points !== undefined ? quizData.show_question_points : true,
+                    quizData.allow_question_feedback !== undefined ? quizData.allow_question_feedback : true,
                     quizData.grade_release_option || 'immediate',
                     quizData.show_correct_answers !== undefined ? quizData.show_correct_answers : true,
                     quizId
@@ -141,7 +159,9 @@ class Quiz {
             
             // Get questions
             const [questionRows] = await db.query(
-                'SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY position',
+                `SELECT * FROM quiz_questions 
+                WHERE quiz_id = ? 
+                ORDER BY position, question_id`,
                 [quizId]
             );
             
@@ -149,7 +169,9 @@ class Quiz {
             const questions = [];
             for (const question of questionRows) {
                 const [optionRows] = await db.query(
-                    'SELECT * FROM question_options WHERE question_id = ? ORDER BY position',
+                    `SELECT * FROM question_options 
+                    WHERE question_id = ? 
+                    ORDER BY position`,
                     [question.question_id]
                 );
                 
@@ -501,116 +523,110 @@ class Quiz {
     }
 
     // Submit quiz attempt
-    static async submitAttempt(attemptId, answers) {
+    static async submitAttempt(quizId, studentId, answers) {
         try {
-            // Start a transaction
-            await db.query('START TRANSACTION');
-            
-            // Get attempt info
-            const [attemptInfo] = await db.query(
-                `SELECT qa.*, q.quiz_id 
-                FROM quiz_attempts qa
-                JOIN quizzes q ON qa.quiz_id = q.quiz_id
-                WHERE qa.attempt_id = ?`,
-                [attemptId]
-            );
-            
-            if (!attemptInfo.length) {
-                throw new Error('Attempt not found');
-            }
-            
-            const quizId = attemptInfo[0].quiz_id;
-            
-            // Mark attempt as completed
-            await db.query(
-                'UPDATE quiz_attempts SET end_time = NOW(), completed = TRUE WHERE attempt_id = ?',
-                [attemptId]
-            );
-            
-            // Process answers
-            let totalPoints = 0;
-            let earnedPoints = 0;
-            
-            for (const answer of answers) {
-                // Get question info
-                const [questionInfo] = await db.query(
-                    'SELECT * FROM quiz_questions WHERE question_id = ?',
-                    [answer.question_id]
+            const connection = await pool.getConnection();
+            await connection.beginTransaction();
+
+            try {
+                // Create quiz attempt
+                const [attemptResult] = await connection.query(
+                    'INSERT INTO quiz_attempts (quiz_id, student_id, start_time, end_time) VALUES (?, ?, NOW(), NOW())',
+                    [quizId, studentId]
                 );
-                
-                if (!questionInfo.length) {
-                    continue;
-                }
-                
-                const question = questionInfo[0];
-                let isCorrect = false;
-                
-                // Handle different question types
-                if (['multiple_choice', 'true_false', 'dropdown'].includes(question.type)) {
-                    // For question types with specific correct answers
-                    const [correctOption] = await db.query(
-                        'SELECT option_id FROM question_options WHERE question_id = ? AND is_correct = TRUE',
-                        [question.question_id]
-                    );
-                    
-                    isCorrect = correctOption.length > 0 && correctOption[0].option_id == answer.selected_option;
-                } else if (question.type === 'matching' || question.type === 'drag_drop') {
-                    // For matching questions, check if all selections are correct
-                    const selectedOptions = answer.selected_options.split(',');
-                    const [correctOptions] = await db.query(
-                        'SELECT option_id FROM question_options WHERE question_id = ? AND is_correct = TRUE',
-                        [question.question_id]
-                    );
-                    
-                    const correctIds = correctOptions.map(opt => opt.option_id.toString());
-                    isCorrect = selectedOptions.length === correctIds.length && 
-                                selectedOptions.every(id => correctIds.includes(id));
-                } else {
-                    // For essay, short answer types - needs manual grading
-                    isCorrect = false; // Will be graded by instructor
-                }
-                
-                // Calculate points
-                const pointsEarned = isCorrect ? question.points : 0;
-                totalPoints += question.points;
-                earnedPoints += pointsEarned;
-                
-                // Save answer
-                await db.query(
-                    `INSERT INTO quiz_answers 
-                    (attempt_id, question_id, student_answer, selected_options, is_correct, points_earned) 
-                    VALUES (?, ?, ?, ?, ?, ?)`,
-                    [
-                        attemptId,
-                        question.question_id,
-                        answer.student_answer || null,
-                        answer.selected_options || null,
-                        isCorrect,
-                        pointsEarned
-                    ]
+                const attemptId = attemptResult.insertId;
+
+                // Get quiz questions and correct answers
+                const [questions] = await connection.query(
+                    `SELECT q.*, qo.option_id, qo.option_text, qo.is_correct, qo.side, qo.correct_match_id
+                     FROM quiz_questions q
+                     LEFT JOIN question_options qo ON q.question_id = qo.question_id
+                     WHERE q.quiz_id = ?`,
+                    [quizId]
                 );
+
+                // Process each answer
+                for (const [questionId, answer] of Object.entries(answers)) {
+                    const question = questions.find(q => q.question_id === parseInt(questionId));
+                    if (!question) continue;
+
+                    let isCorrect = false;
+                    let selectedOptions = null;
+
+                    switch (question.question_type) {
+                        case 'multiple_choice':
+                        case 'true_false':
+                            selectedOptions = answer;
+                            const correctOption = questions.find(q => 
+                                q.question_id === parseInt(questionId) && 
+                                q.is_correct === 1
+                            );
+                            isCorrect = correctOption && selectedOptions === correctOption.option_id;
+                            break;
+
+                        case 'matching':
+                            selectedOptions = JSON.stringify(answer);
+                            const matchingItems = questions.filter(q => 
+                                q.question_id === parseInt(questionId) && 
+                                q.side === 'left'
+                            );
+                            const matchingAnswers = questions.filter(q => 
+                                q.question_id === parseInt(questionId) && 
+                                q.side === 'right'
+                            );
+                            
+                            isCorrect = matchingAnswers.every((match, idx) => {
+                                const userMatch = answer[idx];
+                                return userMatch === match.correct_match_id;
+                            });
+                            break;
+
+                        case 'short_answer':
+                            selectedOptions = answer;
+                            isCorrect = answer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
+                            break;
+
+                        case 'essay':
+                            selectedOptions = answer;
+                            // Essay questions are not auto-graded
+                            isCorrect = null;
+                            break;
+                    }
+
+                    // Save the answer
+                    await connection.query(
+                        `INSERT INTO quiz_answers 
+                         (attempt_id, question_id, selected_options, is_correct) 
+                         VALUES (?, ?, ?, ?)`,
+                        [attemptId, questionId, selectedOptions, isCorrect]
+                    );
+                }
+
+                // Calculate total score
+                const [answers] = await connection.query(
+                    'SELECT is_correct FROM quiz_answers WHERE attempt_id = ?',
+                    [attemptId]
+                );
+
+                const totalQuestions = questions.filter(q => q.question_type !== 'essay').length;
+                const correctAnswers = answers.filter(a => a.is_correct === 1).length;
+                const score = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+
+                // Update attempt with score
+                await connection.query(
+                    'UPDATE quiz_attempts SET score = ? WHERE attempt_id = ?',
+                    [score, attemptId]
+                );
+
+                await connection.commit();
+                return { attemptId, score };
+            } catch (error) {
+                await connection.rollback();
+                throw error;
+            } finally {
+                connection.release();
             }
-            
-            // Calculate and update score
-            const score = totalPoints > 0 ? (earnedPoints / totalPoints) * 100 : 0;
-            
-            await db.query(
-                'UPDATE quiz_attempts SET score = ?, graded = TRUE WHERE attempt_id = ?',
-                [score, attemptId]
-            );
-            
-            // Commit transaction
-            await db.query('COMMIT');
-            
-            return {
-                attemptId,
-                score,
-                earnedPoints,
-                totalPoints
-            };
         } catch (error) {
-            // Rollback on error
-            await db.query('ROLLBACK');
             console.error('Error submitting quiz attempt:', error);
             throw error;
         }
@@ -619,13 +635,16 @@ class Quiz {
     // Get student attempts for a quiz
     static async getStudentAttempts(quizId, studentId) {
         try {
-            const [rows] = await db.query(
-                `SELECT * FROM quiz_attempts 
-                WHERE quiz_id = ? AND student_id = ?
-                ORDER BY start_time DESC`,
+            const [attempts] = await db.query(
+                `SELECT qa.*, 
+                    (SELECT COUNT(*) FROM quiz_answers WHERE attempt_id = qa.attempt_id) as questions_answered
+                FROM quiz_attempts qa
+                WHERE qa.quiz_id = ? AND qa.student_id = ?
+                ORDER BY qa.created_at DESC`,
                 [quizId, studentId]
             );
-            return rows;
+            
+            return attempts;
         } catch (error) {
             console.error('Error getting student quiz attempts:', error);
             throw error;
@@ -646,6 +665,30 @@ class Quiz {
             return rows;
         } catch (error) {
             console.error('Error finding quizzes by course:', error);
+            throw error;
+        }
+    }
+
+    // Get quiz statistics
+    static async getStatistics(quizId) {
+        try {
+            const [stats] = await db.query(
+                `SELECT 
+                    COUNT(DISTINCT qa.attempt_id) as total_attempts,
+                    COUNT(DISTINCT qa.student_id) as unique_students,
+                    AVG(qa.score) as average_score,
+                    MIN(qa.score) as lowest_score,
+                    MAX(qa.score) as highest_score,
+                    COUNT(CASE WHEN qa.score >= q.passing_score THEN 1 END) as passing_students
+                FROM quiz_attempts qa
+                JOIN quizzes q ON qa.quiz_id = q.quiz_id
+                WHERE q.quiz_id = ? AND qa.status = 'graded'`,
+                [quizId]
+            );
+            
+            return stats[0];
+        } catch (error) {
+            console.error('Error getting quiz statistics:', error);
             throw error;
         }
     }

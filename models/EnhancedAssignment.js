@@ -166,17 +166,19 @@ class EnhancedAssignment {
                 // Update existing submission
                 const [result] = await db.query(
                     `UPDATE enhanced_submissions SET
-                    submission_text = ?,
-                    file_path = ?,
-                    external_url = ?,
-                    submission_date = NOW(),
+                    content = ?,
+                    file_url = ?,
+                    file_type = ?,
+                    file_name = ?,
+                    submitted_at = NOW(),
                     is_late = ?,
                     updated_at = NOW()
                     WHERE submission_id = ?`,
                     [
-                        submissionData.submission_text || null,
-                        submissionData.file_path || null,
-                        submissionData.external_url || null,
+                        submissionData.content || null,
+                        submissionData.file_url || null,
+                        submissionData.file_type || null,
+                        submissionData.file_name || null,
                         isLate,
                         existingSubmission[0].submission_id
                     ]
@@ -191,14 +193,15 @@ class EnhancedAssignment {
                 // Create new submission
                 const [result] = await db.query(
                     `INSERT INTO enhanced_submissions
-                    (assignment_id, student_id, submission_text, file_path, external_url, submission_date, is_late)
-                    VALUES (?, ?, ?, ?, ?, NOW(), ?)`,
+                    (assignment_id, student_id, content, file_url, file_type, file_name, submitted_at, is_late)
+                    VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)`,
                     [
                         submissionData.assignment_id,
                         submissionData.student_id,
-                        submissionData.submission_text || null,
-                        submissionData.file_path || null,
-                        submissionData.external_url || null,
+                        submissionData.content || null,
+                        submissionData.file_url || null,
+                        submissionData.file_type || null,
+                        submissionData.file_name || null,
                         isLate
                     ]
                 );
@@ -244,11 +247,23 @@ class EnhancedAssignment {
     static async getSubmissions(assignmentId) {
         try {
             const [rows] = await db.query(
-                `SELECT es.*, u.first_name, u.last_name, u.username
+                `SELECT es.*, u.first_name, u.last_name, u.username,
+                        CASE 
+                            WHEN es.file_url IS NOT NULL THEN es.file_url
+                            ELSE NULL
+                        END as file_url,
+                        CASE 
+                            WHEN es.file_url IS NOT NULL THEN SUBSTRING_INDEX(es.file_url, '.', -1)
+                            ELSE NULL
+                        END as file_type,
+                        CASE 
+                            WHEN es.file_url IS NOT NULL THEN SUBSTRING_INDEX(es.file_url, '/', -1)
+                            ELSE NULL
+                        END as file_name
                 FROM enhanced_submissions es
                 JOIN users u ON es.student_id = u.user_id
                 WHERE es.assignment_id = ?
-                ORDER BY es.submission_date DESC`,
+                ORDER BY es.submitted_at DESC`,
                 [assignmentId]
             );
             return rows;
@@ -263,7 +278,20 @@ class EnhancedAssignment {
         try {
             const [rows] = await db.query(
                 `SELECT es.*, u.first_name, u.last_name, u.username,
-                        ea.title as assignment_title, ea.due_date, ea.points_possible
+                        ea.title as assignment_title, ea.due_date, ea.points_possible,
+                        CASE 
+                            WHEN es.file_url IS NOT NULL THEN es.file_url
+                            WHEN es.content IS NOT NULL THEN NULL
+                            ELSE NULL
+                        END as file_url,
+                        CASE 
+                            WHEN es.file_url IS NOT NULL THEN SUBSTRING_INDEX(es.file_url, '.', -1)
+                            ELSE NULL
+                        END as file_type,
+                        CASE 
+                            WHEN es.file_url IS NOT NULL THEN SUBSTRING_INDEX(es.file_url, '/', -1)
+                            ELSE NULL
+                        END as file_name
                 FROM enhanced_submissions es
                 JOIN users u ON es.student_id = u.user_id
                 JOIN enhanced_assignments ea ON es.assignment_id = ea.assignment_id
@@ -337,6 +365,83 @@ class EnhancedAssignment {
             };
         } catch (error) {
             console.error('Error toggling assignment publish status:', error);
+            throw error;
+        }
+    }
+
+    // Get a specific submission with file details
+    static async getSubmissionWithFileDetails(submissionId) {
+        try {
+            const [rows] = await db.query(
+                `SELECT es.*, u.first_name, u.last_name, u.username,
+                        ea.title as assignment_title, ea.due_date, ea.points_possible,
+                        ea.submission_type, ea.allowed_file_types,
+                        CASE 
+                            WHEN es.file_url IS NOT NULL THEN es.file_url
+                            WHEN es.content IS NOT NULL THEN NULL
+                            ELSE NULL
+                        END as file_url,
+                        CASE 
+                            WHEN es.file_url IS NOT NULL THEN 
+                                CASE 
+                                    WHEN es.file_type IS NOT NULL THEN es.file_type
+                                    ELSE SUBSTRING_INDEX(es.file_url, '.', -1)
+                                END
+                            ELSE NULL
+                        END as file_type,
+                        CASE 
+                            WHEN es.file_url IS NOT NULL THEN 
+                                CASE 
+                                    WHEN es.file_name IS NOT NULL THEN es.file_name
+                                    ELSE SUBSTRING_INDEX(es.file_url, '/', -1)
+                                END
+                            ELSE NULL
+                        END as file_name,
+                        CASE
+                            WHEN es.score IS NOT NULL THEN 'graded'
+                            WHEN es.submitted_at IS NOT NULL THEN 'submitted'
+                            ELSE 'not_submitted'
+                        END as status,
+                        CASE
+                            WHEN es.graded_at IS NOT NULL THEN es.graded_at
+                            ELSE NULL
+                        END as graded_at,
+                        CASE
+                            WHEN es.graded_by IS NOT NULL THEN 
+                                (SELECT CONCAT(first_name, ' ', last_name) 
+                                 FROM users 
+                                 WHERE user_id = es.graded_by)
+                            ELSE NULL
+                        END as graded_by_name
+                FROM enhanced_submissions es
+                JOIN users u ON es.student_id = u.user_id
+                JOIN enhanced_assignments ea ON es.assignment_id = ea.assignment_id
+                WHERE es.submission_id = ?`,
+                [submissionId]
+            );
+            
+            if (rows.length === 0) {
+                return null;
+            }
+
+            const submission = rows[0];
+
+            // Get previous submissions if any
+            if (submission.submission_count > 1) {
+                const [previousSubmissions] = await db.query(
+                    `SELECT submission_id, submitted_at, score, graded_at
+                     FROM enhanced_submissions
+                     WHERE assignment_id = ? AND student_id = ?
+                     AND submission_id != ?
+                     ORDER BY submitted_at DESC`,
+                    [submission.assignment_id, submission.student_id, submissionId]
+                );
+                submission.previous_submissions = previousSubmissions;
+            }
+
+            return submission;
+        } catch (error) {
+            console.error('Error getting submission with file details:', error);
             throw error;
         }
     }

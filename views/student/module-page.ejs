@@ -1,0 +1,202 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2"><%= page.title %></h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/student/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/student/courses">My Courses</a></li>
+                    <li class="breadcrumb-item"><a href="/student/courses/<%= course.course_id %>"><%= course.title %></a></li>
+                    <li class="breadcrumb-item active"><%= page.title %></li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <div class="d-flex justify-content-md-end gap-2">
+                <a href="/student/courses/<%= course.course_id %>" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Course
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Page Navigation Sidebar -->
+        <div class="col-lg-3">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><%= module.title %></h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <% if (modulePages && modulePages.length > 0) { %>
+                            <div class="list-group-item list-group-item-secondary">
+                                <strong><i class="fas fa-file-alt me-2"></i> Content Pages</strong>
+                            </div>
+                            <% modulePages.forEach(page => { %>
+                                <a href="/student/courses/<%= course.course_id %>/modules/<%= module.module_id %>/pages/<%= page.page_id %>" 
+                                   class="list-group-item list-group-item-action">
+                                    <i class="fas fa-file-alt me-2"></i>
+                                    <%= page.title %>
+                                </a>
+                            <% }); %>
+                        <% } %>
+                        
+                        <% if (moduleAssignments && moduleAssignments.length > 0) { %>
+                            <div class="list-group-item list-group-item-secondary">
+                                <strong><i class="fas fa-tasks me-2"></i> Module Assignments</strong>
+                            </div>
+                            <% moduleAssignments.forEach(assignment => { %>
+                                <a href="/student/assignments/<%= assignment.assignment_id %>" 
+                                   class="list-group-item list-group-item-action">
+                                    <i class="fas fa-clipboard-list me-2"></i>
+                                    <%= assignment.title %>
+                                    <% if (assignment.due_date) { %>
+                                        <small class="d-block text-muted">Due: <%= new Date(assignment.due_date).toLocaleDateString() %></small>
+                                    <% } %>
+                                </a>
+                            <% }); %>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-lg-9">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="content-area">
+                        <%- page.content %>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pagination -->
+            <div class="d-flex justify-content-between mt-4">
+                <% if (prevPage) { %>
+                    <a href="/student/courses/<%= course.course_id %>/modules/<%= module.module_id %>/pages/<%= prevPage.page_id %>" class="btn btn-outline-primary">
+                        <i class="fas fa-chevron-left me-1"></i> Previous: <%= prevPage.title %>
+                    </a>
+                <% } else { %>
+                    <div></div>
+                <% } %>
+                
+                <% if (nextPage) { %>
+                    <a href="/student/courses/<%= course.course_id %>/modules/<%= module.module_id %>/pages/<%= nextPage.page_id %>" class="btn btn-primary">
+                        Next: <%= nextPage.title %> <i class="fas fa-chevron-right ms-1"></i>
+                    </a>
+                <% } else { %>
+                    <a href="/student/courses/<%= course.course_id %>" class="btn btn-success">
+                        Complete Module <i class="fas fa-check ms-1"></i>
+                    </a>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .content-area {
+        font-size: 1.1rem;
+        line-height: 1.6;
+    }
+    
+    .content-area img {
+        max-width: 100%;
+        height: auto;
+        margin: 1rem 0;
+        border-radius: 0.25rem;
+    }
+    
+    .content-area h1, .content-area h2, .content-area h3, .content-area h4, .content-area h5, .content-area h6 {
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .content-area a {
+        color: #007bff;
+        text-decoration: none;
+    }
+    
+    .content-area a:hover {
+        text-decoration: underline;
+    }
+    
+    .content-area ul, .content-area ol {
+        margin-bottom: 1rem;
+    }
+    
+    .content-area table {
+        width: 100%;
+        margin-bottom: 1rem;
+        border-collapse: collapse;
+    }
+    
+    .content-area table td, .content-area table th {
+        padding: 0.5rem;
+        border: 1px solid #dee2e6;
+    }
+    
+    .content-area table th {
+        background-color: #f8f9fa;
+    }
+    
+    .content-area pre {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.25rem;
+        overflow-x: auto;
+    }
+    
+    .content-area code {
+        background-color: #f8f9fa;
+        padding: 0.2rem 0.4rem;
+        border-radius: 0.25rem;
+    }
+    
+    .content-area blockquote {
+        border-left: 0.25rem solid #dee2e6;
+        padding-left: 1rem;
+        margin-left: 0;
+        color: #6c757d;
+    }
+    
+    .content-area .embed-responsive {
+        position: relative;
+        display: block;
+        width: 100%;
+        padding: 0;
+        overflow: hidden;
+    }
+    
+    .content-area .embed-responsive::before {
+        display: block;
+        content: "";
+        padding-top: 56.25%;
+    }
+    
+    .content-area .embed-responsive-item {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+    }
+    
+    .list-group-item.active {
+        background-color: #e9f2ff;
+        color: #007bff;
+        border-color: #dee2e6;
+    }
+    
+    @media (max-width: 992px) {
+        .pagination {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+    }
+</style> 
