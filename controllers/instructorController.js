@@ -910,4 +910,259 @@ exports.removeStudentFromCourse = async (req, res) => {
         req.flash('error_msg', 'An error occurred while removing the student from the course');
         res.redirect(`/instructor/courses/${req.params.id}/students`);
     }
+};
+
+// Get course grade management page
+exports.getCourseGrades = async (req, res) => {
+    try {
+        const courseId = req.params.courseId;
+        const instructorId = req.session.user.user_id;
+
+        // Verify instructor has access to this course
+        const [course] = await db.query(
+            `SELECT c.*, s.semester_name 
+             FROM courses c
+             JOIN course_instructors ci ON c.course_id = ci.course_id
+             JOIN semesters s ON c.semester_id = s.semester_id
+             WHERE c.course_id = ? AND ci.instructor_id = ?`,
+            [courseId, instructorId]
+        );
+
+        if (!course || course.length === 0) {
+            req.flash('error_msg', 'You do not have access to this course');
+            return res.redirect('/instructor/courses');
+        }
+
+        // Get grade weights
+        const [weights] = await db.query(
+            'SELECT * FROM course_weights WHERE course_id = ?',
+            [courseId]
+        );
+
+        // Get enrolled students with their grades
+        const [students] = await db.query(
+            `SELECT 
+                u.user_id,
+                u.first_name,
+                u.last_name,
+                CONCAT(u.first_name, ' ', u.last_name) as student_name,
+                e.enrollment_date,
+                e.status as enrollment_status,
+                g.quiz_score,
+                g.assignment_score,
+                g.midterm_score,
+                g.final_score,
+                g.total_score,
+                g.status as grade_status,
+                g.posted_at,
+                g.approved_at
+             FROM enrollments e
+             JOIN users u ON e.student_id = u.user_id
+             LEFT JOIN grades g ON e.student_id = g.student_id AND e.course_id = g.course_id
+             WHERE e.course_id = ?
+             ORDER BY u.last_name, u.first_name`,
+            [courseId]
+        );
+
+        // Get course assignments and quizzes for reference
+        const [assignments] = await db.query(
+            `SELECT 
+                'assignment' as type,
+                assignment_id as id,
+                title,
+                points_possible as max_points,
+                due_date
+             FROM enhanced_assignments
+             WHERE module_id IN (SELECT module_id FROM modules WHERE course_id = ?)
+             UNION ALL
+             SELECT 
+                'quiz' as type,
+                quiz_id as id,
+                title,
+                points_possible as max_points,
+                end_date as due_date
+             FROM quizzes
+             WHERE module_id IN (SELECT module_id FROM modules WHERE course_id = ?)
+             ORDER BY due_date`,
+            [courseId, courseId]
+        );
+
+        res.render('instructor/course-grades', {
+            title: 'Course Grade Management',
+            course: course[0],
+            weights: weights[0] || {
+                quiz_weight: 30,
+                assignment_weight: 30,
+                midterm_weight: 10,
+                final_weight: 30
+            },
+            students,
+            assignments,
+            currentPage: 'grades'
+        });
+    } catch (error) {
+        console.error('Error in getCourseGrades:', error);
+        req.flash('error_msg', 'An error occurred while loading course grades');
+        res.redirect('/instructor/courses');
+    }
+};
+
+// Update grade weights
+exports.updateGradeWeights = async (req, res) => {
+    try {
+        const courseId = req.params.courseId;
+        const { quiz_weight, assignment_weight, midterm_weight, final_weight } = req.body;
+        const instructorId = req.session.user.user_id;
+
+        // Verify instructor has access to this course
+        const [course] = await db.query(
+            `SELECT c.* 
+             FROM courses c
+             JOIN course_instructors ci ON c.course_id = ci.course_id
+             WHERE c.course_id = ? AND ci.instructor_id = ?`,
+            [courseId, instructorId]
+        );
+
+        if (!course || course.length === 0) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        // Validate total weight equals 100
+        const total = parseFloat(quiz_weight) + parseFloat(assignment_weight) + 
+                     parseFloat(midterm_weight) + parseFloat(final_weight);
+        
+        if (Math.abs(total - 100) > 0.01) {
+            return res.status(400).json({ error: 'Total weight must equal 100%' });
+        }
+
+        // Update or insert weights
+        await db.query(
+            `INSERT INTO course_weights 
+             (course_id, quiz_weight, assignment_weight, midterm_weight, final_weight)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+             quiz_weight = VALUES(quiz_weight),
+             assignment_weight = VALUES(assignment_weight),
+             midterm_weight = VALUES(midterm_weight),
+             final_weight = VALUES(final_weight)`,
+            [courseId, quiz_weight, assignment_weight, midterm_weight, final_weight]
+        );
+
+        // Recalculate all student grades with new weights
+        await db.query(
+            `UPDATE grades 
+             SET total_score = (
+                 (quiz_score * ? + 
+                  assignment_score * ? + 
+                  midterm_score * ? + 
+                  final_score * ?) / 100
+             )
+             WHERE course_id = ?`,
+            [quiz_weight, assignment_weight, midterm_weight, final_weight, courseId]
+        );
+
+        res.json({ 
+            success: true,
+            message: 'Grade weights updated successfully'
+        });
+    } catch (error) {
+        console.error('Error in updateGradeWeights:', error);
+        res.status(500).json({ error: 'Failed to update grade weights' });
+    }
+};
+
+// Update student grade
+exports.updateStudentGrade = async (req, res) => {
+    try {
+        const { courseId, studentId } = req.params;
+        const { type, score } = req.body;
+        const instructorId = req.session.user.user_id;
+
+        // Verify instructor has access to this course
+        const [course] = await db.query(
+            'SELECT * FROM courses WHERE course_id = ? AND instructor_id = ?',
+            [courseId, instructorId]
+        );
+
+        if (!course) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        // Get grade weights
+        const [weights] = await db.query(
+            'SELECT * FROM course_weights WHERE course_id = ?',
+            [courseId]
+        );
+
+        if (!weights[0]) {
+            return res.status(400).json({ error: 'Grade weights not configured' });
+        }
+
+        // Update the specific grade component
+        const updateField = `${type}_score`;
+        await db.query(
+            `UPDATE grades 
+             SET ${updateField} = ?,
+                 total_score = (
+                     (quiz_score * ? + 
+                      assignment_score * ? + 
+                      midterm_score * ? + 
+                      final_score * ?) / 100
+                 )
+             WHERE course_id = ? AND student_id = ?`,
+            [
+                score,
+                weights[0].quiz_weight,
+                weights[0].assignment_weight,
+                weights[0].midterm_weight,
+                weights[0].final_weight,
+                courseId,
+                studentId
+            ]
+        );
+
+        // Get updated total score
+        const [updatedGrade] = await db.query(
+            'SELECT total_score FROM grades WHERE course_id = ? AND student_id = ?',
+            [courseId, studentId]
+        );
+
+        res.json({ total_score: updatedGrade[0].total_score });
+    } catch (error) {
+        console.error('Error in updateStudentGrade:', error);
+        res.status(500).json({ error: 'Failed to update grade' });
+    }
+};
+
+// Post grades for approval
+exports.postGrades = async (req, res) => {
+    try {
+        const courseId = req.params.courseId;
+        const instructorId = req.session.user.user_id;
+
+        // Verify instructor has access to this course
+        const [course] = await db.query(
+            'SELECT * FROM courses WHERE course_id = ? AND instructor_id = ?',
+            [courseId, instructorId]
+        );
+
+        if (!course) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        // Update all grades to pending approval
+        await db.query(
+            `UPDATE grades 
+             SET status = 'pending_approval',
+                 posted_by = ?,
+                 posted_at = CURRENT_TIMESTAMP
+             WHERE course_id = ? AND status = 'in_progress'`,
+            [instructorId, courseId]
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error in postGrades:', error);
+        res.status(500).json({ error: 'Failed to post grades' });
+    }
 }; 

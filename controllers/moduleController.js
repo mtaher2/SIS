@@ -6,6 +6,7 @@ const EnhancedAssignment = require('../models/EnhancedAssignment');
 const Course = require('../models/Course');
 const { upload, deleteFile } = require('../utils/upload');
 const db = require('../db');
+const Instructor = require('../models/Instructor');
 
 // Helper function to check if instructor is authorized for a module
 const checkModuleAuthorization = async (moduleId, instructorId) => {
@@ -1762,20 +1763,42 @@ exports.gradeSubmission = async (req, res) => {
             req.flash('error_msg', `Score must be between 0 and ${maxScore}`);
             return res.redirect(`/instructor/modules/${moduleId}/assignments/${assignmentId}/submissions/${submissionId}`);
         }
-        
-        // Update the submission with grade
+
+        // Get submission details
+        const [submission] = await db.query(
+            `SELECT es.*, m.course_id
+             FROM enhanced_submissions es
+             JOIN enhanced_assignments ea ON es.assignment_id = ea.assignment_id
+             JOIN modules m ON ea.module_id = m.module_id
+             WHERE es.submission_id = ?`,
+            [submissionId]
+        );
+
+        if (!submission || submission.length === 0) {
+            req.flash('error_msg', 'Submission not found');
+            return res.redirect(`/instructor/modules/${moduleId}/assignments/${assignmentId}/submissions`);
+        }
+
+        // Update submission with grade
         await db.query(
             `UPDATE enhanced_submissions 
-             SET score = ?, feedback = ?, graded_by = ?, graded_at = NOW(), graded = 1
+             SET score = ?, 
+                 feedback = ?, 
+                 graded_by = ?, 
+                 graded_at = NOW(),
+                 grade_percentage = (score / ?) * 100
              WHERE submission_id = ?`,
-            [parsedScore, feedback, instructorId, submissionId]
+            [parsedScore, feedback, instructorId, maxScore, submissionId]
         );
+
+        // Automatically calculate and update student grades
+        await Instructor.calculateStudentGrades(submission[0].student_id, submission[0].course_id);
         
-        req.flash('success_msg', 'Submission graded successfully');
-        res.redirect(`/instructor/modules/${moduleId}/assignments/${assignmentId}/submissions/${submissionId}`);
+        req.flash('success_msg', 'Grade recorded successfully');
+        res.redirect(`/instructor/modules/${moduleId}/assignments/${assignmentId}/submissions`);
     } catch (error) {
         console.error('Error grading submission:', error);
         req.flash('error_msg', 'An error occurred while grading the submission');
-        res.redirect(`/instructor/modules/${moduleId}/assignments/${assignmentId}/submissions/${submissionId}`);
+        res.redirect(`/instructor/modules/${req.params.moduleId}/assignments/${req.params.assignmentId}/submissions`);
     }
 }; 

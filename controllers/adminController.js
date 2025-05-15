@@ -867,4 +867,198 @@ exports.removeStudentFromCourse = async (req, res) => {
         req.flash('error_msg', 'An error occurred while removing the student from the course');
         res.redirect(`/admin/courses/${req.params.id}/students`);
     }
-}; 
+};
+
+// Get grade approvals page
+exports.getGradeApprovals = async (req, res) => {
+    try {
+        // Get pending grade approvals
+        const [pendingApprovals] = await db.query(
+            `SELECT 
+                c.course_id,
+                c.course_code,
+                c.course_name,
+                CONCAT(u.first_name, ' ', u.last_name) as instructor_name,
+                u.email as instructor_email,
+                COUNT(g.student_id) as student_count,
+                MAX(g.posted_at) as posted_at
+             FROM grades g
+             JOIN courses c ON g.course_id = c.course_id
+             JOIN users u ON c.instructor_id = u.user_id
+             WHERE g.status = 'pending_approval'
+             GROUP BY c.course_id, c.course_code, c.course_name, u.first_name, u.last_name, u.email`
+        );
+
+        res.render('admin/grade-approvals', {
+            title: 'Grade Approvals',
+            pendingApprovals
+        });
+    } catch (error) {
+        console.error('Error in getGradeApprovals:', error);
+        req.flash('error_msg', 'An error occurred while loading grade approvals');
+        res.redirect('/admin/dashboard');
+    }
+};
+
+// Get grade details for a course
+exports.getGradeDetails = async (req, res) => {
+    try {
+        const courseId = req.params.courseId;
+
+        const [grades] = await db.query(
+            `SELECT 
+                g.*,
+                CONCAT(u.first_name, ' ', u.last_name) as student_name
+             FROM grades g
+             JOIN users u ON g.student_id = u.user_id
+             WHERE g.course_id = ? AND g.status = 'pending_approval'`,
+            [courseId]
+        );
+
+        res.json({ grades });
+    } catch (error) {
+        console.error('Error in getGradeDetails:', error);
+        res.status(500).json({ error: 'Failed to load grade details' });
+    }
+};
+
+// Approve grades for a course
+exports.approveGrades = async (req, res) => {
+    try {
+        const courseId = req.params.courseId;
+        const adminId = req.session.user.user_id;
+
+        // Start transaction
+        await db.beginTransaction();
+
+        try {
+            // Update grades to posted status
+            await db.query(
+                `UPDATE grades 
+                 SET status = 'posted',
+                     approved_by = ?,
+                     approved_at = CURRENT_TIMESTAMP
+                 WHERE course_id = ? AND status = 'pending_approval'`,
+                [adminId, courseId]
+            );
+
+            // Calculate and update GPA for affected students
+            const [students] = await db.query(
+                `SELECT DISTINCT student_id 
+                 FROM grades 
+                 WHERE course_id = ? AND status = 'posted'`,
+                [courseId]
+            );
+
+            for (const student of students) {
+                // Get all posted grades for the student
+                const [grades] = await db.query(
+                    `SELECT g.*, c.credit_hours
+                     FROM grades g
+                     JOIN courses c ON g.course_id = c.course_id
+                     WHERE g.student_id = ? AND g.status = 'posted'`,
+                    [student.student_id]
+                );
+
+                // Calculate semester GPA
+                let semesterPoints = 0;
+                let semesterCredits = 0;
+                let cumulativePoints = 0;
+                let cumulativeCredits = 0;
+
+                grades.forEach(grade => {
+                    const points = calculateGradePoints(grade.total_score);
+                    const credits = grade.credit_hours;
+
+                    if (grade.semester_id === currentSemesterId) {
+                        semesterPoints += points * credits;
+                        semesterCredits += credits;
+                    }
+
+                    cumulativePoints += points * credits;
+                    cumulativeCredits += credits;
+                });
+
+                const semesterGPA = semesterCredits > 0 ? semesterPoints / semesterCredits : 0;
+                const cumulativeGPA = cumulativeCredits > 0 ? cumulativePoints / cumulativeCredits : 0;
+
+                // Insert GPA record
+                await db.query(
+                    `INSERT INTO gpa_records 
+                     (student_id, semester_id, semester_gpa, cumulative_gpa)
+                     VALUES (?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                     semester_gpa = VALUES(semester_gpa),
+                     cumulative_gpa = VALUES(cumulative_gpa)`,
+                    [student.student_id, currentSemesterId, semesterGPA, cumulativeGPA]
+                );
+            }
+
+            await db.commit();
+            res.json({ success: true });
+        } catch (error) {
+            await db.rollback();
+            throw error;
+        }
+    } catch (error) {
+        console.error('Error in approveGrades:', error);
+        res.status(500).json({ error: 'Failed to approve grades' });
+    }
+};
+
+// Reject grades for a course
+exports.rejectGrades = async (req, res) => {
+    try {
+        const courseId = req.params.courseId;
+        const { reason } = req.body;
+        const adminId = req.session.user.user_id;
+
+        // Update grades to rejected status
+        await db.query(
+            `UPDATE grades 
+             SET status = 'rejected',
+                 approved_by = ?,
+                 approved_at = CURRENT_TIMESTAMP
+             WHERE course_id = ? AND status = 'pending_approval'`,
+            [adminId, courseId]
+        );
+
+        // Get instructor email
+        const [instructor] = await db.query(
+            `SELECT u.email, c.course_code, c.course_name
+             FROM courses c
+             JOIN users u ON c.instructor_id = u.user_id
+             WHERE c.course_id = ?`,
+            [courseId]
+        );
+
+        // Send notification email to instructor
+        if (instructor[0]) {
+            await sendEmail({
+                to: instructor[0].email,
+                subject: `Grade Rejection: ${instructor[0].course_code}`,
+                text: `Your grades for ${instructor[0].course_name} (${instructor[0].course_code}) have been rejected.\n\nReason: ${reason}\n\nPlease review and resubmit the grades.`
+            });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error in rejectGrades:', error);
+        res.status(500).json({ error: 'Failed to reject grades' });
+    }
+};
+
+// Helper function to calculate grade points
+function calculateGradePoints(score) {
+    if (score >= 90) return 4.0;
+    if (score >= 87) return 3.7;
+    if (score >= 84) return 3.3;
+    if (score >= 80) return 3.0;
+    if (score >= 77) return 2.7;
+    if (score >= 74) return 2.3;
+    if (score >= 70) return 2.0;
+    if (score >= 67) return 1.7;
+    if (score >= 64) return 1.3;
+    if (score >= 60) return 1.0;
+    return 0.0;
+} 

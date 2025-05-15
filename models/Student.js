@@ -113,7 +113,8 @@ class Student {
     // Calculate GPA for a student
     static async calculateGPA(userId) {
         try {
-            const [rows] = await db.query(
+            // Get completed courses with final grades
+            const [completedCourses] = await db.query(
                 `SELECT c.credit_hours, e.final_grade
                 FROM enrollments e
                 JOIN courses c ON e.course_id = c.course_id
@@ -121,9 +122,15 @@ class Student {
                 [userId]
             );
             
-            if (rows.length === 0) {
-                return 0.0;
-            }
+            // Get current courses with grades
+            const [currentCourses] = await db.query(
+                `SELECT c.credit_hours, g.total_score
+                FROM enrollments e
+                JOIN courses c ON e.course_id = c.course_id
+                JOIN grades g ON e.course_id = g.course_id AND e.student_id = g.student_id
+                WHERE e.student_id = ? AND e.final_grade IS NULL AND g.status = 'posted'`,
+                [userId]
+            );
             
             const gradePoints = {
                 'A+': 4.0, 'A': 4.0, 'A-': 3.7,
@@ -136,8 +143,16 @@ class Student {
             let totalPoints = 0;
             let totalCredits = 0;
             
-            for (const row of rows) {
+            // Process completed courses
+            for (const row of completedCourses) {
                 const points = gradePoints[row.final_grade] || 0;
+                totalPoints += points * row.credit_hours;
+                totalCredits += row.credit_hours;
+            }
+            
+            // Process current courses
+            for (const row of currentCourses) {
+                const points = calculateGradePoints(row.total_score);
                 totalPoints += points * row.credit_hours;
                 totalCredits += row.credit_hours;
             }
@@ -147,6 +162,22 @@ class Student {
             console.error('Error calculating GPA:', error);
             throw error;
         }
+    }
+
+    // Helper function to calculate grade points from numeric score
+    static calculateGradePoints(score) {
+        if (!score) return 0;
+        if (score >= 90) return 4.0;
+        if (score >= 87) return 3.7;
+        if (score >= 84) return 3.3;
+        if (score >= 80) return 3.0;
+        if (score >= 77) return 2.7;
+        if (score >= 74) return 2.3;
+        if (score >= 70) return 2.0;
+        if (score >= 67) return 1.7;
+        if (score >= 64) return 1.3;
+        if (score >= 60) return 1.0;
+        return 0.0;
     }
 
     // Get student attendance records

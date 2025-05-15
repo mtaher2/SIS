@@ -213,6 +213,138 @@ class Instructor {
         }
     }
 
+    // Calculate and update student grades automatically
+    static async calculateStudentGrades(studentId, courseId) {
+        try {
+            // Get course weights
+            const [weights] = await db.query(
+                'SELECT * FROM course_weights WHERE course_id = ?',
+                [courseId]
+            );
+
+            if (!weights || weights.length === 0) {
+                throw new Error('Course weights not configured');
+            }
+
+            const weight = weights[0];
+
+            // Calculate quiz score (average of all quiz scores)
+            const [quizScores] = await db.query(
+                `SELECT AVG(score/max_score * 100) as quiz_score
+                 FROM quiz_attempts qa
+                 JOIN quizzes q ON qa.quiz_id = q.quiz_id
+                 JOIN modules m ON q.module_id = m.module_id
+                 WHERE qa.student_id = ? AND m.course_id = ? AND qa.status = 'graded'`,
+                [studentId, courseId]
+            );
+
+            // Calculate assignment score from enhanced_submissions
+            const [assignmentScores] = await db.query(
+                `SELECT 
+                    SUM(es.score) as total_points_earned,
+                    SUM(ea.points_possible) as total_points_possible,
+                    COUNT(DISTINCT ea.assignment_id) as total_assignments
+                 FROM enhanced_submissions es
+                 JOIN enhanced_assignments ea ON es.assignment_id = ea.assignment_id
+                 JOIN modules m ON ea.module_id = m.module_id
+                 WHERE es.student_id = ? 
+                 AND m.course_id = ? 
+                 AND es.score IS NOT NULL
+                 AND es.graded_at IS NOT NULL`,
+                [studentId, courseId]
+            );
+
+            // Calculate assignment percentage
+            let assignmentScore = 0;
+            if (assignmentScores[0].total_points_possible > 0) {
+                assignmentScore = (assignmentScores[0].total_points_earned / assignmentScores[0].total_points_possible) * 100;
+            }
+
+            // Get midterm and final scores if they exist
+            const [examScores] = await db.query(
+                `SELECT 
+                    MAX(CASE WHEN ea.type = 'midterm' THEN es.score/ea.points_possible * 100 END) as midterm_score,
+                    MAX(CASE WHEN ea.type = 'final' THEN es.score/ea.points_possible * 100 END) as final_score
+                 FROM enhanced_submissions es
+                 JOIN enhanced_assignments ea ON es.assignment_id = ea.assignment_id
+                 JOIN modules m ON ea.module_id = m.module_id
+                 WHERE es.student_id = ? 
+                 AND m.course_id = ? 
+                 AND es.score IS NOT NULL
+                 AND es.graded_at IS NOT NULL
+                 AND ea.type IN ('midterm', 'final')`,
+                [studentId, courseId]
+            );
+
+            // Calculate total score using weights
+            const quizScore = quizScores[0].quiz_score || 0;
+            const midtermScore = examScores[0].midterm_score || 0;
+            const finalScore = examScores[0].final_score || 0;
+
+            // Calculate weighted total
+            const totalScore = (
+                (quizScore * weight.quiz_weight) +
+                (assignmentScore * weight.assignment_weight) +
+                (midtermScore * weight.midterm_weight) +
+                (finalScore * weight.final_weight)
+            ) / 100;
+
+            // Update or insert grade record
+            const [existingGrade] = await db.query(
+                'SELECT * FROM grades WHERE student_id = ? AND course_id = ?',
+                [studentId, courseId]
+            );
+
+            if (existingGrade.length > 0) {
+                await db.query(
+                    `UPDATE grades SET
+                    quiz_score = ?,
+                    assignment_score = ?,
+                    midterm_score = ?,
+                    final_score = ?,
+                    total_score = ?,
+                    status = 'in_progress'
+                    WHERE student_id = ? AND course_id = ?`,
+                    [
+                        quizScore,
+                        assignmentScore,
+                        midtermScore,
+                        finalScore,
+                        totalScore,
+                        studentId,
+                        courseId
+                    ]
+                );
+            } else {
+                await db.query(
+                    `INSERT INTO grades
+                    (student_id, course_id, quiz_score, assignment_score, midterm_score, final_score, total_score, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'in_progress')`,
+                    [
+                        studentId,
+                        courseId,
+                        quizScore,
+                        assignmentScore,
+                        midtermScore,
+                        finalScore,
+                        totalScore
+                    ]
+                );
+            }
+
+            return {
+                quizScore,
+                assignmentScore,
+                midtermScore,
+                finalScore,
+                totalScore
+            };
+        } catch (error) {
+            console.error('Error calculating student grades:', error);
+            throw error;
+        }
+    }
+
     // Record final grade for a student in a course
     static async recordFinalGrade(courseId, studentId, finalGrade, instructorId) {
         try {

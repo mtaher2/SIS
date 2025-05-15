@@ -72,6 +72,12 @@ router.post('/announcements/edit/:id', [
 ], adminController.postEditAnnouncement);
 router.delete('/announcements/delete/:id', adminController.deleteAnnouncement);
 
+// Grade Approval Routes
+router.get('/grade-approvals', adminController.getGradeApprovals);
+router.get('/grades/:courseId/details', adminController.getGradeDetails);
+router.post('/grades/:courseId/approve', adminController.approveGrades);
+router.post('/grades/:courseId/reject', adminController.rejectGrades);
+
 // Method Override for DELETE requests
 router.post('/users/delete/:id', (req, res) => {
     adminController.deleteUser(req, res);

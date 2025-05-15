@@ -121,4 +121,10 @@ router.post('/announcements/create', [
     check('target_type', 'Target type is required').notEmpty()
 ], instructorController.postCreateAnnouncement);
 
+// Grade Management Routes
+router.get('/courses/:courseId/grades', instructorController.getCourseGrades);
+router.post('/courses/:courseId/weights', instructorController.updateGradeWeights);
+router.put('/courses/:courseId/grades/:studentId', instructorController.updateStudentGrade);
+router.post('/courses/:courseId/grades/post', instructorController.postGrades);
+
 module.exports = router; 

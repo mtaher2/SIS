@@ -683,18 +683,177 @@ exports.getGrades = async (req, res) => {
         // Get all courses with grades
         const courses = await Student.getEnrolledCourses(studentId);
         
-        // Get all grades
-        const grades = await Student.getGrades(studentId);
-        
-        // Get GPA
-        const gpa = await Student.calculateGPA(studentId);
+        // Get course weights and grades
+        const [courseGrades] = await db.query(
+            `SELECT 
+                c.course_id,
+                c.course_code,
+                c.title,
+                c.credit_hours,
+                c.semester_id,
+                cw.quiz_weight,
+                cw.assignment_weight,
+                cw.midterm_weight,
+                cw.final_weight,
+                g.quiz_score,
+                g.assignment_score,
+                g.midterm_score,
+                g.final_score,
+                g.total_score,
+                g.status,
+                g.posted_at,
+                g.approved_at,
+                s.semester_name,
+                s.start_date,
+                s.end_date,
+                CONCAT(u.first_name, ' ', u.last_name) as instructor_name
+             FROM courses c
+             JOIN enrollments e ON c.course_id = e.course_id
+             LEFT JOIN course_weights cw ON c.course_id = cw.course_id
+             LEFT JOIN grades g ON c.course_id = g.course_id AND g.student_id = e.student_id
+             LEFT JOIN semesters s ON c.semester_id = s.semester_id
+             LEFT JOIN course_instructors ci ON c.course_id = ci.course_id
+             LEFT JOIN users u ON ci.instructor_id = u.user_id
+             WHERE e.student_id = ?
+             ORDER BY s.start_date DESC, c.course_code`,
+            [studentId]
+        );
+
+        // Process grades to calculate weighted scores
+        const processedGrades = courseGrades.map(course => {
+            const weights = {
+                quiz: course.quiz_weight || 0,
+                assignment: course.assignment_weight || 0,
+                midterm: course.midterm_weight || 0,
+                final: course.final_weight || 0
+            };
+
+            // Only consider posted and approved grades
+            const isGradePosted = course.status === 'posted' && course.posted_at && course.approved_at;
+            
+            const scores = {
+                quiz: isGradePosted ? (course.quiz_score || 0) : null,
+                assignment: isGradePosted ? (course.assignment_score || 0) : null,
+                midterm: isGradePosted ? (course.midterm_score || 0) : null,
+                final: isGradePosted ? (course.final_score || 0) : null
+            };
+
+            // Calculate weighted total
+            let weightedTotal = 0;
+            let totalWeight = 0;
+
+            if (scores.quiz !== null && weights.quiz > 0) {
+                weightedTotal += (scores.quiz * weights.quiz) / 100;
+                totalWeight += weights.quiz;
+            }
+            if (scores.assignment !== null && weights.assignment > 0) {
+                weightedTotal += (scores.assignment * weights.assignment) / 100;
+                totalWeight += weights.assignment;
+            }
+            if (scores.midterm !== null && weights.midterm > 0) {
+                weightedTotal += (scores.midterm * weights.midterm) / 100;
+                totalWeight += weights.midterm;
+            }
+            if (scores.final !== null && weights.final > 0) {
+                weightedTotal += (scores.final * weights.final) / 100;
+                totalWeight += weights.final;
+            }
+
+            // Calculate final grade only if there are posted grades
+            const finalGrade = totalWeight > 0 ? (weightedTotal / totalWeight) * 100 : null;
+
+            // Calculate letter grade
+            let letterGrade = null;
+            if (finalGrade !== null) {
+                if (finalGrade >= 90) letterGrade = 'A';
+                else if (finalGrade >= 85) letterGrade = 'A-';
+                else if (finalGrade >= 80) letterGrade = 'B+';
+                else if (finalGrade >= 75) letterGrade = 'B';
+                else if (finalGrade >= 70) letterGrade = 'B-';
+                else if (finalGrade >= 65) letterGrade = 'C+';
+                else if (finalGrade >= 60) letterGrade = 'C';
+                else if (finalGrade >= 55) letterGrade = 'C-';
+                else if (finalGrade >= 50) letterGrade = 'D';
+                else letterGrade = 'F';
+            }
+
+            return {
+                ...course,
+                weights,
+                scores,
+                finalGrade,
+                letterGrade,
+                isGradePosted,
+                totalWeight,
+                weightedTotal,
+                gradeStatus: isGradePosted ? 'posted' : 'pending'
+            };
+        });
+
+        // Get current semester
+        const [currentSemester] = await db.query(
+            `SELECT * FROM semesters WHERE is_active = 1 LIMIT 1`
+        );
+
+        // Filter current courses (not completed)
+        const currentCourses = processedGrades.filter(course => 
+            course.semester_id === currentSemester[0]?.semester_id
+        );
+
+        // Get previous semesters with courses
+        const [previousSemesters] = await db.query(
+            `SELECT DISTINCT s.*, 
+                    (SELECT AVG(g.total_score) 
+                     FROM grades g 
+                     JOIN courses c ON g.course_id = c.course_id
+                     WHERE c.semester_id = s.semester_id 
+                     AND g.student_id = ? 
+                     AND g.status = 'posted'
+                     AND g.posted_at IS NOT NULL
+                     AND g.approved_at IS NOT NULL) as gpa
+             FROM semesters s
+             JOIN courses c ON s.semester_id = c.semester_id
+             JOIN enrollments e ON c.course_id = e.course_id
+             WHERE e.student_id = ? AND s.is_active = 0
+             ORDER BY s.start_date DESC`,
+            [studentId, studentId]
+        );
+
+        // Get courses for each previous semester
+        for (let semester of previousSemesters) {
+            semester.courses = processedGrades.filter(course => 
+                course.semester_id === semester.semester_id
+            );
+        }
+
+        // Get GPA history
+        const [gpaHistory] = await db.query(
+            `SELECT 
+                s.semester_name,
+                s.start_date,
+                COALESCE(gr.semester_gpa, 0) as gpa
+             FROM semesters s
+             LEFT JOIN gpa_records gr ON s.semester_id = gr.semester_id AND gr.student_id = ?
+             WHERE s.semester_id IN (
+                 SELECT DISTINCT c.semester_id 
+                 FROM courses c
+                 JOIN enrollments e ON c.course_id = e.course_id
+                 WHERE e.student_id = ?
+             )
+             ORDER BY s.start_date ASC`,
+            [studentId, studentId]
+        );
         
         res.render('student/grades', {
             title: 'My Grades',
             user: req.session.user,
-            courses,
-            grades,
-            gpa
+            courses: processedGrades,
+            currentCourses,
+            grades: processedGrades,
+            gpa: await Student.calculateGPA(studentId),
+            currentSemester: currentSemester[0] || null,
+            previousSemesters,
+            gpaHistory
         });
     } catch (error) {
         console.error('Error getting grades:', error);
@@ -752,25 +911,44 @@ exports.getAnnouncements = async (req, res) => {
     }
 };
 
-// GPA Calculator
+// Get GPA calculator page
 exports.getGpaCalculator = async (req, res) => {
     try {
         const studentId = req.session.user.user_id;
         
-        // Get all courses
-        const courses = await Student.getEnrolledCourses(studentId);
-        
         // Get current GPA
         const currentGpa = await Student.calculateGPA(studentId);
         
+        // Get current courses with grades
+        const [currentCourses] = await db.query(
+            `SELECT c.*, g.total_score, g.status
+             FROM courses c
+             JOIN enrollments e ON c.course_id = e.course_id
+             LEFT JOIN grades g ON c.course_id = g.course_id AND g.student_id = e.student_id
+             WHERE e.student_id = ? AND e.status = 'active'`,
+            [studentId]
+        );
+
+        // Get total credits taken for GPA
+        const [creditsResult] = await db.query(
+            `SELECT SUM(c.credit_hours) as total_credits
+             FROM enrollments e
+             JOIN courses c ON e.course_id = c.course_id
+             WHERE e.student_id = ? AND e.final_grade IS NOT NULL`,
+            [studentId]
+        );
+
+        const totalCredits = creditsResult[0]?.total_credits || 0;
+
         res.render('student/gpa-calculator', {
             title: 'GPA Calculator',
             user: req.session.user,
-            courses,
-            currentGpa
+            currentCourses: currentCourses || [],
+            currentGpa: currentGpa || 0,
+            totalCredits
         });
     } catch (error) {
-        console.error('Error loading GPA calculator:', error);
+        console.error('Error in getGpaCalculator:', error);
         req.flash('error_msg', 'An error occurred while loading the GPA calculator');
         res.redirect('/student/dashboard');
     }
@@ -779,11 +957,11 @@ exports.getGpaCalculator = async (req, res) => {
 // Calculate estimated GPA
 exports.postGpaCalculator = async (req, res) => {
     try {
-        const { course_id, grade, include_current } = req.body;
+        const { course_id, grade, include_current, exclude_course, previous_grade } = req.body;
         const studentId = req.session.user.user_id;
         
         // Current GPA and courses
-        const currentGpa = parseFloat(await Student.calculateGPA(studentId));
+        const currentGpa = parseFloat(await Student.calculateGPA(studentId)) || 0;
         const courses = await Student.getEnrolledCourses(studentId);
         
         // If we're including current GPA in calculation
@@ -808,6 +986,19 @@ exports.postGpaCalculator = async (req, res) => {
         // Add new course grades to calculation
         const courseIds = Array.isArray(course_id) ? course_id : [course_id];
         const grades = Array.isArray(grade) ? grade : [grade];
+        const excludeCourses = Array.isArray(exclude_course) ? exclude_course : [exclude_course];
+        const previousGrades = Array.isArray(previous_grade) ? previous_grade : [previous_grade];
+        
+        const gradePoints = {
+            'A+': 4.0, 'A': 4.0, 'A-': 3.7,
+            'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+            'C+': 2.3, 'C': 2.0, 'C-': 1.7,
+            'D+': 1.3, 'D': 1.0, 'D-': 0.7,
+            'F': 0.0
+        };
+        
+        let excludedPoints = 0;
+        let excludedCredits = 0;
         
         for (let i = 0; i < courseIds.length; i++) {
             if (courseIds[i] && grades[i]) {
@@ -815,40 +1006,50 @@ exports.postGpaCalculator = async (req, res) => {
                 const course = courses.find(c => c.course_id == courseIds[i]);
                 
                 if (course) {
-                    // Convert letter grade to GPA points
-                    let points = 0;
+                    const gradeValue = grades[i].toUpperCase();
+                    const points = gradePoints[gradeValue] || 0;
                     
-                    switch (grades[i].toUpperCase()) {
-                        case 'A+': case 'A': points = 4.0; break;
-                        case 'A-': points = 3.7; break;
-                        case 'B+': points = 3.3; break;
-                        case 'B': points = 3.0; break;
-                        case 'B-': points = 2.7; break;
-                        case 'C+': points = 2.3; break;
-                        case 'C': points = 2.0; break;
-                        case 'C-': points = 1.7; break;
-                        case 'D+': points = 1.3; break;
-                        case 'D': points = 1.0; break;
-                        case 'D-': points = 0.7; break;
-                        case 'F': points = 0.0; break;
+                    if (excludeCourses[i] === 'true') {
+                        const prevGradeValue = previousGrades[i]?.toUpperCase();
+                        const prevPoints = gradePoints[prevGradeValue] || 0;
+                        excludedPoints += prevPoints * course.credit_hours;
+                        excludedCredits += course.credit_hours;
+                    } else {
+                        totalPoints += points * course.credit_hours;
+                        totalCredits += course.credit_hours;
                     }
-                    
-                    totalPoints += points * course.credit_hours;
-                    totalCredits += course.credit_hours;
                 }
             }
         }
         
         // Calculate estimated GPA
-        const estimatedGpa = totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : 0;
+        const estimatedGpa = totalCredits > 0 ? ((totalPoints - excludedPoints) / (totalCredits - excludedCredits)).toFixed(2) : 0;
+        
+        // Get current courses for display
+        const [currentCourses] = await db.query(
+            `SELECT c.*, g.total_score, g.status
+             FROM courses c
+             JOIN enrollments e ON c.course_id = e.course_id
+             LEFT JOIN grades g ON c.course_id = g.course_id AND g.student_id = e.student_id
+             WHERE e.student_id = ? AND e.status = 'active'`,
+            [studentId]
+        );
         
         res.render('student/gpa-calculator', {
             title: 'GPA Calculator',
             user: req.session.user,
-            courses,
-            currentGpa,
+            currentCourses: currentCourses || [],
+            currentGpa: currentGpa || 0,
             estimatedGpa,
-            formData: req.body
+            formData: req.body,
+            gradePoints: Object.keys(gradePoints),
+            calculationDetails: {
+                totalPoints,
+                totalCredits,
+                excludedPoints,
+                excludedCredits,
+                coursesIncluded: courseIds.length
+            }
         });
     } catch (error) {
         console.error('Error calculating GPA:', error);
@@ -965,3 +1166,101 @@ exports.getModulePage = async (req, res) => {
         res.redirect('/student/dashboard');
     }
 };
+
+// Get unofficial transcript
+exports.getTranscript = async (req, res) => {
+    try {
+        const studentId = req.session.user.user_id;
+
+        // Get student profile
+        const [profile] = await db.query(
+            'SELECT * FROM student_profiles WHERE user_id = ?',
+            [studentId]
+        );
+
+        // Get course history with grades
+        const [courses] = await db.query(
+            `SELECT 
+                c.course_code,
+                c.course_name,
+                c.credit_hours,
+                g.total_score,
+                g.letter_grade,
+                s.semester_name,
+                s.start_date,
+                s.end_date
+             FROM enrollments e
+             JOIN courses c ON e.course_id = c.course_id
+             JOIN semesters s ON e.semester_id = s.semester_id
+             LEFT JOIN grades g ON e.course_id = g.course_id AND e.student_id = g.student_id
+             WHERE e.student_id = ?
+             ORDER BY s.start_date DESC, c.course_code`,
+            [studentId]
+        );
+
+        // Organize courses by semester
+        const courseHistory = {};
+        courses.forEach(course => {
+            if (!courseHistory[course.semester_name]) {
+                courseHistory[course.semester_name] = [];
+            }
+            courseHistory[course.semester_name].push({
+                ...course,
+                grade_points: calculateGradePoints(course.total_score)
+            });
+        });
+
+        // Get GPA history
+        const [gpaHistory] = await db.query(
+            `SELECT 
+                s.semester_name,
+                gr.semester_gpa as gpa
+             FROM gpa_records gr
+             JOIN semesters s ON gr.semester_id = s.semester_id
+             WHERE gr.student_id = ?
+             ORDER BY s.start_date DESC`,
+            [studentId]
+        );
+
+        // Calculate total credits
+        const totalCredits = courses.reduce((sum, course) => {
+            return sum + (course.letter_grade ? course.credit_hours : 0);
+        }, 0);
+
+        // Get current GPA
+        const currentGpa = await Student.calculateGPA(studentId);
+
+        res.render('student/transcript', {
+            title: 'Unofficial Transcript',
+            user: req.session.user,
+            profile: profile[0],
+            courseHistory,
+            gpaHistory,
+            totalCredits,
+            gpa: {
+                current: currentGpa,
+                semester: gpaHistory[0]?.gpa || 0
+            }
+        });
+    } catch (error) {
+        console.error('Error in getTranscript:', error);
+        req.flash('error_msg', 'An error occurred while generating your transcript');
+        res.redirect('/student/dashboard');
+    }
+};
+
+// Helper function to calculate grade points
+function calculateGradePoints(score) {
+    if (!score) return null;
+    if (score >= 90) return 4.0;
+    if (score >= 87) return 3.7;
+    if (score >= 84) return 3.3;
+    if (score >= 80) return 3.0;
+    if (score >= 77) return 2.7;
+    if (score >= 74) return 2.3;
+    if (score >= 70) return 2.0;
+    if (score >= 67) return 1.7;
+    if (score >= 64) return 1.3;
+    if (score >= 60) return 1.0;
+    return 0.0;
+}
