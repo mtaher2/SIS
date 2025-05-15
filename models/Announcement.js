@@ -1,4 +1,5 @@
 const db = require('../db');
+const spamDetector = require('../utils/spamDetector');
 
 class Announcement {
     // Find announcement by ID
@@ -25,17 +26,22 @@ class Announcement {
     // Create a new announcement
     static async create(announcementData) {
         try {
+            // Classify the announcement content
+            const spamClassification = await spamDetector.classifyMessage(announcementData.content);
+            
             const [result] = await db.query(
                 `INSERT INTO announcements 
-                (title, content, created_by, target_type, course_id, is_active)
-                VALUES (?, ?, ?, ?, ?, ?)`,
+                (title, content, created_by, target_type, course_id, is_active, is_spam, spam_confidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     announcementData.title,
                     announcementData.content,
                     announcementData.created_by,
                     announcementData.target_type,
                     announcementData.course_id || null,
-                    announcementData.is_active !== undefined ? announcementData.is_active : true
+                    announcementData.is_active !== undefined ? announcementData.is_active : true,
+                    spamClassification.isSpam,
+                    spamClassification.confidence
                 ]
             );
             return result.insertId;
@@ -48,13 +54,18 @@ class Announcement {
     // Update announcement
     static async update(id, announcementData) {
         try {
+            // Re-classify the content on update
+            const spamClassification = await spamDetector.classifyMessage(announcementData.content);
+            
             const [result] = await db.query(
                 `UPDATE announcements SET
                 title = ?,
                 content = ?,
                 target_type = ?,
                 course_id = ?,
-                is_active = ?
+                is_active = ?,
+                is_spam = ?,
+                spam_confidence = ?
                 WHERE announcement_id = ?`,
                 [
                     announcementData.title,
@@ -62,6 +73,8 @@ class Announcement {
                     announcementData.target_type,
                     announcementData.course_id || null,
                     announcementData.is_active !== undefined ? announcementData.is_active : true,
+                    spamClassification.isSpam,
+                    spamClassification.confidence,
                     id
                 ]
             );
@@ -121,6 +134,12 @@ class Announcement {
             if (filters.is_active !== undefined) {
                 conditions.push('a.is_active = ?');
                 params.push(filters.is_active);
+            }
+            
+            // Add spam filter
+            if (filters.is_spam !== undefined) {
+                conditions.push('a.is_spam = ?');
+                params.push(filters.is_spam);
             }
             
             if (conditions.length > 0) {

@@ -12,6 +12,15 @@
         </div>
     </div>
 
+    <!-- Spam filter controls -->
+    <div class="mb-4">
+        <div class="btn-group" role="group">
+            <a href="/student/announcements" class="btn btn-outline-primary <%= !filters || !filters.is_spam ? 'active' : '' %>">All</a>
+            <a href="/student/announcements?filter=regular" class="btn btn-outline-success <%= filters && filters.is_spam === false ? 'active' : '' %>">Regular</a>
+            <a href="/student/announcements?filter=spam" class="btn btn-outline-danger <%= filters && filters.is_spam === true ? 'active' : '' %>">Spam</a>
+        </div>
+    </div>
+
     <!-- Filter and Search -->
     <div class="card mb-4">
         <div class="card-body">
@@ -47,18 +56,31 @@
         <% if (announcements && announcements.length > 0) { %>
             <% announcements.forEach(announcement => { %>
                 <div class="col-md-6 mb-4">
-                    <div class="card h-100 announcement-card">
+                    <div class="card h-100 announcement-card <%= announcement.is_spam ? 'border-danger' : '' %>">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><%= announcement.title %></h5>
-                            <% if (announcement.target_type === 'all') { %>
-                                <span class="badge bg-primary">All Users</span>
-                            <% } else if (announcement.target_type === 'student') { %>
-                                <span class="badge bg-info">Students</span>
-                            <% } else if (announcement.target_type === 'course') { %>
-                                <span class="badge bg-success">Course: <%= announcement.course_code || '' %></span>
-                            <% } %>
+                            <div>
+                                <% if (announcement.is_spam) { %>
+                                    <span class="badge bg-danger me-1" title="Spam confidence: <%= Math.round(announcement.spam_confidence * 100) %>%">
+                                        <i class="fas fa-exclamation-triangle"></i> Spam
+                                    </span>
+                                <% } %>
+                                <% if (announcement.target_type === 'all') { %>
+                                    <span class="badge bg-primary">All Users</span>
+                                <% } else if (announcement.target_type === 'student') { %>
+                                    <span class="badge bg-info">Students</span>
+                                <% } else if (announcement.target_type === 'course') { %>
+                                    <span class="badge bg-success">Course: <%= announcement.course_code || '' %></span>
+                                <% } %>
+                            </div>
                         </div>
                         <div class="card-body">
+                            <% if (announcement.is_spam) { %>
+                                <div class="alert alert-warning mb-3">
+                                    <i class="fas fa-exclamation-triangle me-2"></i> 
+                                    This announcement has been identified as potential spam.
+                                </div>
+                            <% } %>
                             <div class="announcement-content mb-3">
                                 <%= announcement.content %>
                             </div>

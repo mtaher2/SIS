@@ -11,6 +11,9 @@ dotenv.config({ path: './config.env' });
 // Import database connection
 const db = require('./db');
 
+// Import database migration utilities
+const { updateAnnouncementsTable } = require('./utils/updateDB');
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
@@ -21,6 +24,9 @@ const announcementRoutes = require('./routes/announcements');
 
 // Import auth middleware
 const { restrictAccess } = require('./utils/auth');
+
+// Import spam detector service
+const spamDetector = require('./utils/spamDetector');
 
 // Initialize Express app
 const app = express();
@@ -134,7 +140,27 @@ app.use((err, req, res, next) => {
 });
 
 // Start the server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`http://localhost:${PORT}`);
+    
+    // Run database migrations for spam detection
+    try {
+        await updateAnnouncementsTable();
+    } catch (error) {
+        console.error('Failed to update database schema for spam detection:', error);
+    }
+    
+    // Check if spam detection service is available
+    try {
+        const isSpamDetectorAvailable = await spamDetector.isServiceAvailable();
+        if (isSpamDetectorAvailable) {
+            console.log('✅ Spam detection service is running');
+        } else {
+            console.warn('⚠️ Spam detection service is not available. Announcements will not be classified for spam. Start the service by running:');
+            console.warn('cd SIS-spam_detector && python run.py');
+        }
+    } catch (error) {
+        console.error('Error checking spam detection service:', error);
+    }
 }); 

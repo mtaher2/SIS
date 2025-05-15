@@ -17,6 +17,15 @@
         </div>
     </div>
 
+    <!-- Spam filter controls -->
+    <div class="mb-4">
+        <div class="btn-group" role="group">
+            <a href="/admin/announcements" class="btn btn-outline-primary <%= !filters || !filters.is_spam ? 'active' : '' %>">All</a>
+            <a href="/admin/announcements?filter=regular" class="btn btn-outline-success <%= filters && filters.is_spam === false ? 'active' : '' %>">Regular</a>
+            <a href="/admin/announcements?filter=spam" class="btn btn-outline-danger <%= filters && filters.is_spam === true ? 'active' : '' %>">Spam</a>
+        </div>
+    </div>
+
     <!-- Announcements List -->
     <div class="card">
         <div class="card-body">
@@ -30,6 +39,7 @@
                                 <th>Created By</th>
                                 <th>Date</th>
                                 <th>Status</th>
+                                <th>Spam</th>
                                 <th class="text-end">Actions</th>
                             </tr>
                         </thead>
@@ -65,6 +75,13 @@
                                             <span class="badge bg-success">Active</span>
                                         <% } else { %>
                                             <span class="badge bg-danger">Inactive</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (announcement.is_spam) { %>
+                                            <span class="badge bg-danger" title="Confidence: <%= Math.round(announcement.spam_confidence * 100) %>%">Spam</span>
+                                        <% } else { %>
+                                            <span class="badge bg-success">OK</span>
                                         <% } %>
                                     </td>
                                     <td>

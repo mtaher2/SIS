@@ -499,12 +499,23 @@ exports.deleteCourse = async (req, res) => {
 // Announcement management - list all announcements
 exports.getAnnouncements = async (req, res) => {
     try {
-        const announcements = await Announcement.findAll();
+        const filter = req.query.filter;
+        const filters = {};
+        
+        // Apply spam filtering
+        if (filter === 'spam') {
+            filters.is_spam = true;
+        } else if (filter === 'regular') {
+            filters.is_spam = false;
+        }
+        
+        const announcements = await Announcement.findAll(filters);
         
         res.render('admin/announcements', {
             title: 'Announcement Management',
             user: req.session.user,
-            announcements
+            announcements,
+            filters
         });
     } catch (error) {
         console.error('Error getting announcements:', error);
