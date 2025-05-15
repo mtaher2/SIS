@@ -31,7 +31,15 @@
                     </li>
                     <% if (user) { %>
                     <li class="nav-item">
+                        <% if (user.role === 'admin') { %>
                         <a class="nav-link" href="/courses">Courses</a>
+                        <% } %>
+                        <% if (user.role === 'instructor') { %>
+                        <a class="nav-link" href="/instructor/courses">Courses</a>
+                        <% } %>
+                        <% if (user.role === 'student') { %>
+                        <a class="nav-link" href="/student/courses">Courses</a>
+                        <% } %>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/announcements">Announcements</a>
@@ -80,9 +88,6 @@
                         <li class="nav-item">
                             <a class="nav-link" href="/auth/login">Login</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/auth/register">Register</a>
-                        </li>
                     <% } %>
                 </ul>
             </div>
@@ -92,21 +97,21 @@
     <!-- Flash Messages -->
     <div class="container mt-3">
         <% if (typeof success_msg !== 'undefined' && success_msg.length > 0) { %>
-            <div class="alert alert-success alert-dismissible fade show">
+            <div class="alert alert-success alert-dismissible fade show flash-message">
                 <%= success_msg %>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         <% } %>
 
         <% if (typeof error_msg !== 'undefined' && error_msg.length > 0) { %>
-            <div class="alert alert-danger alert-dismissible fade show">
+            <div class="alert alert-danger alert-dismissible fade show flash-message">
                 <%= error_msg %>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         <% } %>
 
         <% if (typeof error !== 'undefined' && error.length > 0) { %>
-            <div class="alert alert-danger alert-dismissible fade show">
+            <div class="alert alert-danger alert-dismissible fade show flash-message">
                 <%= error %>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
@@ -141,7 +146,6 @@
                         <% } %>
                         <% if (!user) { %>
                         <li class="mb-2"><a href="/auth/login" class="text-white">Login</a></li>
-                        <li class="mb-2"><a href="/auth/register" class="text-white">Register</a></li>
                         <% } %>
                     </ul>
                 </div>
@@ -166,5 +170,87 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- Custom JS -->
     <script src="/js/main.js"></script>
+    
+    <!-- Auto-hide flash messages after 3 seconds -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const flashMessages = document.querySelectorAll('.flash-message');
+            
+            if (flashMessages.length > 0) {
+                flashMessages.forEach(function(message) {
+                    setTimeout(function() {
+                        // Fade out
+                        message.style.transition = 'opacity 0.5s ease';
+                        message.style.opacity = '0';
+                        
+                        // Remove from DOM after transition
+                        setTimeout(function() {
+                            message.style.display = 'none';
+                        }, 500);
+                    }, 3000);
+                });
+            }
+        });
+    </script>
+
+    <!-- Debug section in layouts/main.ejs -->
+    <% if (process.env.NODE_ENV !== 'production') { %>
+        <div class="debug-panel" style="display: none; position: fixed; bottom: 0; right: 0; width: 350px; max-height: 80vh; overflow-y: auto; background: rgba(0,0,0,0.8); color: #fff; padding: 10px; font-family: monospace; font-size: 12px; z-index: 9999; border-top-left-radius: 5px;">
+            <h6>Debug Info <button onclick="this.parentElement.parentElement.style.display='none'" style="float:right; background: none; border: none; color: white;">&times;</button></h6>
+            <div>
+                <strong>URL:</strong> <span id="debug-url"></span>
+            </div>
+            <div>
+                <strong>Route params:</strong> <span id="debug-params"></span>
+            </div>
+            <div>
+                <strong>User:</strong> <%= typeof user !== 'undefined' && user && user.username ? user.username : 'Not logged in' %>
+            </div>
+            <div>
+                <strong>Session ID:</strong> <span id="debug-session"></span>
+            </div>
+            <div>
+                <strong>Flash messages:</strong>
+                <pre><%= typeof success_msg !== 'undefined' || typeof error_msg !== 'undefined' ? JSON.stringify({success: success_msg, error: error_msg}, null, 2) : 'None' %></pre>
+            </div>
+            <div>
+                <strong>Template data:</strong>
+                <% if (typeof quizResults !== 'undefined' && quizResults && quizResults.quiz) { %>
+                    <div style="margin-left: 10px;">
+                        <div><strong>Quiz:</strong> <%= quizResults.quiz.title %> (ID: <%= quizResults.quiz.quiz_id %>)</div>
+                        <div><strong>Score:</strong> <%= quizResults.score %> / <%= quizResults.totalPoints %></div>
+                        <div><strong>Questions:</strong> <%= quizResults.answers ? quizResults.answers.length : 0 %></div>
+                    </div>
+                <% } else { %>
+                    <span>No quiz results data</span>
+                <% } %>
+            </div>
+        </div>
+        <button id="debug-toggle-btn" style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 16px; z-index: 9998; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            🐞
+        </button>
+        <script>
+            // Add keyboard shortcut to toggle debug panel (Ctrl+Shift+D)
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                    toggleDebugPanel();
+                    e.preventDefault();
+                }
+            });
+            
+            // Fill debug info
+            document.getElementById('debug-url').textContent = window.location.href;
+            document.getElementById('debug-params').textContent = window.location.pathname.split('/').filter(Boolean).join(', ');
+            document.getElementById('debug-session').textContent = document.cookie.includes('connect.sid') ? 'Active' : 'None';
+            
+            // Toggle button handler
+            document.getElementById('debug-toggle-btn').addEventListener('click', toggleDebugPanel);
+            
+            function toggleDebugPanel() {
+                const panel = document.querySelector('.debug-panel');
+                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            }
+        </script>
+    <% } %>
 </body>
 </html> 

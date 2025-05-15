@@ -1,0 +1,580 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2"><%= course.title %></h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/student/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/student/courses">My Courses</a></li>
+                    <li class="breadcrumb-item active"><%= course.title %></li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <div class="d-flex justify-content-md-end gap-2">
+                <a href="/student/grades?course_id=<%= course.course_id %>" class="btn btn-outline-primary">
+                    <i class="fas fa-graduation-cap me-1"></i> Grades
+                </a>
+                <a href="/student/attendance?course_id=<%= course.course_id %>" class="btn btn-outline-info">
+                    <i class="fas fa-calendar-check me-1"></i> Attendance
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Course Overview -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Course Overview</h5>
+                    <div>
+                        <span class="badge bg-secondary me-2"><%= course.course_code %></span>
+                        <span class="badge bg-info"><%= course.credit_hours %> Credits</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <div>
+                            <strong>Semester:</strong> <%= course.semester_name %>
+                        </div>
+                        <div>
+                            <% if (course.final_grade) { %>
+                                <span class="badge bg-<%= course.final_grade >= 90 ? 'success' : course.final_grade >= 80 ? 'primary' : course.final_grade >= 70 ? 'info' : course.final_grade >= 60 ? 'warning' : 'danger' %> rounded-pill">
+                                    Final Grade: <%= course.final_grade %>
+                                </span>
+                            <% } else { %>
+                                <span class="badge bg-secondary rounded-pill">No Final Grade</span>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold mb-2">Description</h6>
+                    <p class="mb-4"><%= course.description || 'No description available.' %></p>
+
+                    <h6 class="fw-bold mb-2">Instructors</h6>
+                    <% if (instructors && instructors.length > 0) { %>
+                        <div class="row row-cols-1 row-cols-md-2 g-3 mb-4">
+                            <% instructors.forEach(instructor => { %>
+                                <div class="col">
+                                    <div class="card instructor-card h-100">
+                                        <div class="card-body">
+                                            <h6 class="mb-2"><%= instructor.first_name %> <%= instructor.last_name %></h6>
+                                            <% if (instructor.email) { %>
+                                                <div class="mb-1"><i class="fas fa-envelope me-2"></i><%= instructor.email %></div>
+                                            <% } %>
+                                            <% if (instructor.office_location) { %>
+                                                <div class="mb-1"><i class="fas fa-map-marker-alt me-2"></i><%= instructor.office_location %></div>
+                                            <% } %>
+                                            <% if (instructor.office_hours) { %>
+                                                <div class="mb-1"><i class="fas fa-clock me-2"></i><%= instructor.office_hours %></div>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% }); %>
+                        </div>
+                    <% } else { %>
+                        <p class="text-muted">No instructors assigned to this course.</p>
+                    <% } %>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-2">Course Dates</h6>
+                            <p>
+                                <i class="fas fa-calendar-alt me-2"></i>
+                                <%= new Date(course.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %> - 
+                                <%= new Date(course.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Course Modules -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Course Modules</h5>
+                </div>
+                <div class="card-body">
+                    <div class="accordion mt-4" id="moduleAccordion">
+                        <% if (modules && modules.length) { %>
+                            <% modules.forEach((module, index) => { %>
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="heading<%= module.module_id %>">
+                                        <button class="accordion-button <%= index === 0 ? '' : 'collapsed' %>" type="button" data-bs-toggle="collapse" data-bs-target="#collapse<%= module.module_id %>" aria-expanded="<%= index === 0 ? 'true' : 'false' %>" aria-controls="collapse<%= module.module_id %>">
+                                            <i class="fas fa-book me-2"></i> <%= module.title %>
+                                        </button>
+                                    </h2>
+                                    <div id="collapse<%= module.module_id %>" class="accordion-collapse collapse <%= index === 0 ? 'show' : '' %>" aria-labelledby="heading<%= module.module_id %>" data-bs-parent="#moduleAccordion">
+                                        <div class="accordion-body p-0">
+                                            <!-- Module content/pages -->
+                                            <% if (pagesByModule[module.title] && pagesByModule[module.title].length > 0) { %>
+                                                <div class="list-group list-group-flush">
+                                                    <div class="list-group-item list-group-item-secondary">
+                                                        <strong><i class="fas fa-file-alt me-2"></i> Content Pages</strong>
+                                                    </div>
+                                                    <% pagesByModule[module.title].forEach(page => { %>
+                                                        <a href="/student/courses/<%= course.course_id %>/modules/<%= module.module_id %>/pages/<%= page.page_id %>" 
+                                                           class="list-group-item list-group-item-action">
+                                                            <i class="fas fa-file-alt me-2"></i>
+                                                            <%= page.title %>
+                                                        </a>
+                                                    <% }); %>
+                                                </div>
+                                            <% } else { %>
+                                                <div class="list-group-item">No content pages available for this module.</div>
+                                            <% } %>
+                                            
+                                            <!-- Module assignments -->
+                                            <% if (assignmentsByModule[module.title] && assignmentsByModule[module.title].length > 0) { %>
+                                                <div class="list-group list-group-flush">
+                                                    <div class="list-group-item list-group-item-secondary">
+                                                        <strong><i class="fas fa-tasks me-2"></i> Assignments</strong>
+                                                    </div>
+                                                    <% assignmentsByModule[module.title].forEach(assignment => { %>
+                                                        <a href="/student/courses/<%= course.course_id %>/assignments/<%= assignment.assignment_id %>" 
+                                                           class="list-group-item list-group-item-action">
+                                                            <i class="fas fa-clipboard-list me-2"></i>
+                                                            <%= assignment.title %>
+                                                            <% if (assignment.due_date) { %>
+                                                                <small class="d-block text-muted">Due: <%= new Date(assignment.due_date).toLocaleDateString() %></small>
+                                                            <% } %>
+                                                        </a>
+                                                    <% }); %>
+                                                </div>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% }); %>
+                            
+                            <!-- General Materials Section -->
+                            <% if (materialsByModule["General Materials"] && materialsByModule["General Materials"].length > 0) { %>
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="headingMaterials">
+                                        <button class="accordion-button collapsed" type="button" 
+                                                data-bs-toggle="collapse" 
+                                                data-bs-target="#collapseMaterials" 
+                                                aria-expanded="false" 
+                                                aria-controls="collapseMaterials">
+                                            <i class="fas fa-file me-2"></i> General Materials
+                                        </button>
+                                    </h2>
+                                    <div id="collapseMaterials" 
+                                         class="accordion-collapse collapse" 
+                                         aria-labelledby="headingMaterials" 
+                                         data-bs-parent="#moduleAccordion">
+                                        <div class="accordion-body p-0">
+                                            <div class="list-group list-group-flush">
+                                                <% materialsByModule["General Materials"].forEach(material => { %>
+                                                    <a href="<%= material.file_path || material.link_url %>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" target="_blank">
+                                                        <div>
+                                                            <% if (material.material_type === 'pdf') { %>
+                                                                <i class="fas fa-file-pdf text-danger me-2"></i>
+                                                            <% } else if (material.material_type === 'doc' || material.material_type === 'docx') { %>
+                                                                <i class="fas fa-file-word text-primary me-2"></i>
+                                                            <% } else if (material.material_type === 'ppt' || material.material_type === 'pptx') { %>
+                                                                <i class="fas fa-file-powerpoint text-warning me-2"></i>
+                                                            <% } else if (material.material_type === 'xls' || material.material_type === 'xlsx') { %>
+                                                                <i class="fas fa-file-excel text-success me-2"></i>
+                                                            <% } else if (material.material_type === 'zip' || material.material_type === 'rar') { %>
+                                                                <i class="fas fa-file-archive text-secondary me-2"></i>
+                                                            <% } else if (material.material_type === 'video') { %>
+                                                                <i class="fas fa-file-video text-danger me-2"></i>
+                                                            <% } else if (material.material_type === 'link') { %>
+                                                                <i class="fas fa-link text-info me-2"></i>
+                                                            <% } else { %>
+                                                                <i class="fas fa-file text-secondary me-2"></i>
+                                                            <% } %>
+                                                            <%= material.title %>
+                                                        </div>
+                                                        <div class="d-flex align-items-center">
+                                                            <span class="text-muted me-3"><small>
+                                                                <%= new Date(material.upload_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %>
+                                                            </small></span>
+                                                            <span><i class="fas fa-download"></i></span>
+                                                        </div>
+                                                    </a>
+                                                <% }); %>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% } %>
+                            
+                            <!-- General Assignments Section -->
+                            <% if (assignmentsByModule["General Assignments"] && assignmentsByModule["General Assignments"].length > 0) { %>
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="headingAssignments">
+                                        <button class="accordion-button collapsed" type="button" 
+                                                data-bs-toggle="collapse" 
+                                                data-bs-target="#collapseAssignments" 
+                                                aria-expanded="false" 
+                                                aria-controls="collapseAssignments">
+                                            <i class="fas fa-tasks me-2"></i> Course Assignments
+                                        </button>
+                                    </h2>
+                                    <div id="collapseAssignments" 
+                                         class="accordion-collapse collapse" 
+                                         aria-labelledby="headingAssignments" 
+                                         data-bs-parent="#moduleAccordion">
+                                        <div class="accordion-body p-0">
+                                            <div class="list-group list-group-flush">
+                                                <% assignmentsByModule["General Assignments"].forEach(assignment => { %>
+                                                    <a href="/student/assignments/<%= assignment.assignment_id %>" 
+                                                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                                        <div>
+                                                            <i class="fas fa-clipboard-list me-2"></i>
+                                                            <%= assignment.title %>
+                                                        </div>
+                                                        <div class="d-flex align-items-center">
+                                                            <% if (assignment.due_date) { %>
+                                                                <span class="text-muted me-3"><small>
+                                                                    Due: <%= new Date(assignment.due_date).toLocaleDateString() %>
+                                                                </small></span>
+                                                            <% } %>
+                                                            <span><i class="fas fa-chevron-right"></i></span>
+                                                        </div>
+                                                    </a>
+                                                <% }); %>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% } %>
+                        <% } else if (materialsByModule["General Materials"] && materialsByModule["General Materials"].length > 0) { %>
+                            <!-- Only General Materials, No Modules -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingMaterials">
+                                    <button class="accordion-button" type="button" 
+                                            data-bs-toggle="collapse" 
+                                            data-bs-target="#collapseMaterials" 
+                                            aria-expanded="true" 
+                                            aria-controls="collapseMaterials">
+                                        <i class="fas fa-file me-2"></i> Course Materials
+                                    </button>
+                                </h2>
+                                <div id="collapseMaterials" 
+                                     class="accordion-collapse collapse show" 
+                                     aria-labelledby="headingMaterials" 
+                                     data-bs-parent="#moduleAccordion">
+                                    <div class="accordion-body p-0">
+                                        <div class="list-group list-group-flush">
+                                            <% materialsByModule["General Materials"].forEach(material => { %>
+                                                <a href="<%= material.file_path || material.link_url %>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" target="_blank">
+                                                    <div>
+                                                        <% if (material.material_type === 'pdf') { %>
+                                                            <i class="fas fa-file-pdf text-danger me-2"></i>
+                                                        <% } else if (material.material_type === 'doc' || material.material_type === 'docx') { %>
+                                                            <i class="fas fa-file-word text-primary me-2"></i>
+                                                        <% } else if (material.material_type === 'ppt' || material.material_type === 'pptx') { %>
+                                                            <i class="fas fa-file-powerpoint text-warning me-2"></i>
+                                                        <% } else if (material.material_type === 'xls' || material.material_type === 'xlsx') { %>
+                                                            <i class="fas fa-file-excel text-success me-2"></i>
+                                                        <% } else if (material.material_type === 'zip' || material.material_type === 'rar') { %>
+                                                            <i class="fas fa-file-archive text-secondary me-2"></i>
+                                                        <% } else if (material.material_type === 'video') { %>
+                                                            <i class="fas fa-file-video text-danger me-2"></i>
+                                                        <% } else if (material.material_type === 'link') { %>
+                                                            <i class="fas fa-link text-info me-2"></i>
+                                                        <% } else { %>
+                                                            <i class="fas fa-file text-secondary me-2"></i>
+                                                        <% } %>
+                                                        <%= material.title %>
+                                                    </div>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="text-muted me-3"><small>
+                                                            <%= new Date(material.upload_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %>
+                                                        </small></span>
+                                                        <span><i class="fas fa-download"></i></span>
+                                                    </div>
+                                                </a>
+                                            <% }); %>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <% } else { %>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i> No modules available for this course yet.
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assignments -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Assignments</h5>
+                </div>
+                <div class="card-body">
+                    <% if (assignments && assignments.length > 0) { %>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Due Date</th>
+                                        <th>Status</th>
+                                        <th>Max Points</th>
+                                        <th>Grade</th>
+                                        <th width="100">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% assignments.forEach(assignment => { 
+                                        const dueDate = new Date(assignment.due_date);
+                                        const isOverdue = dueDate < new Date() && !assignment.is_submitted;
+                                        
+                                        // Find the student's grade for this assignment
+                                        const grade = grades ? grades.find(g => g.assignment_id === assignment.assignment_id) : null;
+                                    %>
+                                        <tr>
+                                            <td>
+                                                <strong><%= assignment.title %></strong>
+                                                <% if (assignment.description) { %>
+                                                    <button class="btn btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#desc<%= assignment.assignment_id %>" aria-expanded="false">
+                                                        <i class="fas fa-info-circle text-info"></i>
+                                                    </button>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <%= dueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %>
+                                            </td>
+                                            <td>
+                                                <% if (assignment.is_submitted) { %>
+                                                    <span class="badge bg-success">Submitted</span>
+                                                <% } else if (isOverdue) { %>
+                                                    <span class="badge bg-danger">Overdue</span>
+                                                <% } else { %>
+                                                    <span class="badge bg-warning">Pending</span>
+                                                <% } %>
+                                            </td>
+                                            <td><%= assignment.max_points %></td>
+                                            <td>
+                                                <% if (grade && grade.status === 'graded' && grade.points !== null) { %>
+                                                    <span class="badge bg-<%= (grade.points/assignment.max_points*100) >= 90 ? 'success' : (grade.points/assignment.max_points*100) >= 80 ? 'primary' : (grade.points/assignment.max_points*100) >= 70 ? 'info' : (grade.points/assignment.max_points*100) >= 60 ? 'warning' : 'danger' %>">
+                                                        <%= grade.points %>/<%= assignment.max_points %>
+                                                    </span>
+                                                <% } else { %>
+                                                    <span class="badge bg-secondary">Not Graded</span>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <a href="/student/assignments/<%= assignment.assignment_id %>" class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        <% if (assignment.description) { %>
+                                            <tr class="collapse" id="desc<%= assignment.assignment_id %>">
+                                                <td colspan="6" class="bg-light">
+                                                    <div class="p-2">
+                                                        <%= assignment.description %>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <% } %>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        </div>
+                    <% } else { %>
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle me-2"></i> No assignments available yet.
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Progress Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Your Progress</h5>
+                </div>
+                <div class="card-body">
+                    <% 
+                        let completedAssignments = 0;
+                        let totalAssignments = assignments ? assignments.length : 0;
+                        
+                        if (assignments && assignments.length > 0) {
+                            assignments.forEach(assignment => {
+                                if (assignment.is_submitted) {
+                                    completedAssignments++;
+                                }
+                            });
+                        }
+                        
+                        const progressPercentage = totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
+                    %>
+                    
+                    <div class="text-center mb-4">
+                        <div class="position-relative d-inline-block">
+                            <div class="progress-circle" style="--progress: <%= progressPercentage %>%">
+                                <div class="progress-circle-inner">
+                                    <span class="progress-percentage"><%= progressPercentage %>%</span>
+                                    <span class="progress-label">Complete</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span>Assignments Completed</span>
+                        <span class="fw-bold"><%= completedAssignments %>/<%= totalAssignments %></span>
+                    </div>
+                    <div class="progress mb-4" style="height: 8px">
+                        <div class="progress-bar bg-success progress-bar-striped" 
+                             role="progressbar" 
+                             data-width="<%= progressPercentage %>"
+                             aria-valuenow="<%= progressPercentage %>" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100"></div>
+                    </div>
+                    
+                    <% if (grades && grades.length > 0) { 
+                        let totalPoints = 0;
+                        let maxPoints = 0;
+                        
+                        grades.forEach(grade => {
+                            if (grade.points !== null) {
+                                totalPoints += grade.points;
+                                maxPoints += grade.max_points;
+                            }
+                        });
+                        
+                        const gradePercentage = maxPoints > 0 ? Math.round((totalPoints / maxPoints) * 100) : 0;
+                    %>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span>Current Grade</span>
+                            <span class="fw-bold"><%= gradePercentage %>%</span>
+                        </div>
+                        <div class="progress" style="height: 8px">
+                            <div class="progress-bar bg-<%= gradePercentage >= 90 ? 'success' : gradePercentage >= 80 ? 'primary' : gradePercentage >= 70 ? 'info' : gradePercentage >= 60 ? 'warning' : 'danger' %> progress-bar-striped" 
+                                 role="progressbar" 
+                                 data-width="<%= gradePercentage %>"
+                                 aria-valuenow="<%= gradePercentage %>" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100"></div>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+
+            <!-- Announcements -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Course Announcements</h5>
+                </div>
+                <div class="card-body">
+                    <% if (announcements && announcements.length > 0) { %>
+                        <div class="announcements-list">
+                            <% announcements.forEach(announcement => { %>
+                                <div class="announcement-item mb-3 pb-3 border-bottom">
+                                    <h6 class="fw-bold"><%= announcement.title %></h6>
+                                    <p class="text-muted mb-2">
+                                        <small><i class="fas fa-calendar-alt me-1"></i> 
+                                            <%= new Date(announcement.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %>
+                                        </small>
+                                    </p>
+                                    <p class="mb-0"><%= announcement.content %></p>
+                                </div>
+                            <% }); %>
+                        </div>
+                    <% } else { %>
+                        <div class="text-center py-3">
+                            <i class="fas fa-bullhorn text-secondary mb-2" style="font-size: 2rem;"></i>
+                            <p class="mb-0">No announcements yet</p>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Progress circle */
+    .progress-circle {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: conic-gradient(#28a745 var(--progress), #e9ecef 0);
+        position: relative;
+    }
+    
+    .progress-circle-inner {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: white;
+    }
+    
+    .progress-percentage {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #28a745;
+    }
+    
+    .progress-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    
+    /* Progress bar width */
+    .progress-bar {
+        transition: width 0.6s ease;
+    }
+    
+    .progress-bar[data-width] {
+        width: attr(data-width);
+    }
+    
+    /* Instructor cards */
+    .instructor-card {
+        transition: transform 0.2s;
+    }
+    
+    .instructor-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Responsive fixes */
+    @media (max-width: 768px) {
+        .progress-circle {
+            width: 120px;
+            height: 120px;
+        }
+        
+        .progress-circle-inner {
+            width: 90px;
+            height: 90px;
+        }
+        
+        .progress-percentage {
+            font-size: 1.2rem;
+        }
+    }
+</style>
+
+<script>
+    // Set progress bar widths after page load
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.progress-bar[data-width]').forEach(function(bar) {
+            bar.style.width = bar.getAttribute('data-width') + '%';
+        });
+    });
+</script> 

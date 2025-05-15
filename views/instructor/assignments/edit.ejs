@@ -1,0 +1,211 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">Edit Assignment</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses">My Courses</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>"><%= course.title %></a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>/modules">Modules</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/modules/<%= module.module_id %>/assignments">Assignments</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>"><%= assignment.title %></a></li>
+                    <li class="breadcrumb-item active">Edit</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Back to Assignment
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-edit me-2"></i> Edit Assignment</h5>
+        </div>
+        <div class="card-body">
+            <form action="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>?_method=PUT" method="POST">
+                <!-- Assignment Details -->
+                <div class="mb-3">
+                    <label for="title" class="form-label">Assignment Title</label>
+                    <input type="text" class="form-control" id="title" name="title" value="<%= assignment.title %>" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="instructions" class="form-label">Instructions</label>
+                    <!-- Hidden textarea to store the HTML content -->
+                    <textarea id="instructions" name="instructions" style="display: none;"><%= assignment.instructions %></textarea>
+                    <!-- Quill editor container -->
+                    <div id="editor-container" style="height: 300px; border: 1px solid #ccc; border-radius: 4px;"></div>
+                    <div class="form-text">Provide detailed instructions for this assignment.</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="submission_type" class="form-label">Submission Type</label>
+                        <select class="form-select" id="submission_type" name="submission_type" required>
+                            <option value="file" <%= assignment.submission_type === 'file' ? 'selected' : '' %>>File Upload</option>
+                            <option value="text" <%= assignment.submission_type === 'text' ? 'selected' : '' %>>Text Entry</option>
+                            <option value="url" <%= assignment.submission_type === 'url' ? 'selected' : '' %>>Website URL</option>
+                            <option value="media" <%= assignment.submission_type === 'media' ? 'selected' : '' %>>Media Recording</option>
+                            <option value="external" <%= assignment.submission_type === 'external' ? 'selected' : '' %>>External Tool</option>
+                            <option value="none" <%= assignment.submission_type === 'none' ? 'selected' : '' %>>No Submission</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="points_possible" class="form-label">Points Possible</label>
+                        <input type="number" class="form-control" id="points_possible" name="points_possible" min="0" value="<%= assignment.points_possible %>" required>
+                    </div>
+                </div>
+                
+                <div class="mb-3 file-types-container" style="<%= assignment.submission_type !== 'file' ? 'display: none;' : '' %>">
+                    <label for="allowed_file_types" class="form-label">Allowed File Types</label>
+                    <input type="text" class="form-control" id="allowed_file_types" name="allowed_file_types" placeholder="pdf,doc,docx,ppt,pptx,xls,xlsx,jpg,png,zip" value="<%= assignment.allowed_file_types || '' %>">
+                    <div class="form-text">Comma-separated list of file extensions (without dots). Leave blank to allow all types.</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="due_date" class="form-label">Due Date</label>
+                        <input type="datetime-local" class="form-control" id="due_date" name="due_date" value="<%= assignment.due_date ? new Date(assignment.due_date).toISOString().slice(0, 16) : '' %>">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="available_from" class="form-label">Available From</label>
+                        <input type="datetime-local" class="form-control" id="available_from" name="available_from" value="<%= assignment.available_from ? new Date(assignment.available_from).toISOString().slice(0, 16) : '' %>">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="available_until" class="form-label">Available Until</label>
+                        <input type="datetime-local" class="form-control" id="available_until" name="available_until" value="<%= assignment.available_until ? new Date(assignment.available_until).toISOString().slice(0, 16) : '' %>">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="allow_late_submissions" name="allow_late_submissions" value="true" <%= assignment.allow_late_submissions ? 'checked' : '' %>>
+                        <label class="form-check-label" for="allow_late_submissions">
+                            Allow late submissions
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3 late-submission-container" style="<%= !assignment.allow_late_submissions ? 'display: none;' : '' %>">
+                    <label for="late_submission_deduction" class="form-label">Late Submission Deduction (%)</label>
+                    <input type="number" class="form-control" id="late_submission_deduction" name="late_submission_deduction" min="0" max="100" value="<%= assignment.late_submission_deduction || 0 %>">
+                    <div class="form-text">Percentage of points to deduct for late submissions.</div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="published" name="published" value="true" <%= assignment.published ? 'checked' : '' %>>
+                        <label class="form-check-label" for="published">
+                            Published
+                        </label>
+                        <div class="form-text">If unchecked, the assignment will be saved as a draft.</div>
+                    </div>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Save Changes
+                    </button>
+                    <a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-end mt-4">
+        <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteAssignmentModal">
+            <i class="fas fa-trash me-1"></i> Delete Assignment
+        </button>
+    </div>
+</div>
+
+<!-- Delete Assignment Modal -->
+<div class="modal fade" id="deleteAssignmentModal" tabindex="-1" aria-labelledby="deleteAssignmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteAssignmentModalLabel">Delete Assignment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i> Warning: This action cannot be undone.
+                </div>
+                <p>Are you sure you want to delete this assignment? This will permanently remove the assignment and all associated student submissions.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>?_method=DELETE" method="POST">
+                    <button type="submit" class="btn btn-danger">Delete Assignment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include Quill.js library and styles -->
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Quill editor
+        const quill = new Quill('#editor-container', {
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'color': [] }, { 'background': [] }],
+                    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['link', 'image', 'video'],
+                    ['clean']
+                ]
+            },
+            theme: 'snow'  // or 'bubble'
+        });
+        
+        // Set initial content
+        quill.root.innerHTML = document.getElementById('instructions').value;
+        
+        // Handle conditional display of file types input
+        const submissionTypeSelect = document.getElementById('submission_type');
+        const fileTypesContainer = document.querySelector('.file-types-container');
+        
+        submissionTypeSelect.addEventListener('change', function() {
+            if (this.value === 'file') {
+                fileTypesContainer.style.display = 'block';
+            } else {
+                fileTypesContainer.style.display = 'none';
+            }
+        });
+        
+        // Handle conditional display of late submission deduction
+        const allowLateSubmissions = document.getElementById('allow_late_submissions');
+        const lateSubmissionContainer = document.querySelector('.late-submission-container');
+        
+        allowLateSubmissions.addEventListener('change', function() {
+            if (this.checked) {
+                lateSubmissionContainer.style.display = 'block';
+            } else {
+                lateSubmissionContainer.style.display = 'none';
+            }
+        });
+        
+        // Handle form submission
+        const form = document.querySelector('form');
+        form.onsubmit = function() {
+            // Get editor content and update hidden textarea
+            const instructionsField = document.getElementById('instructions');
+            instructionsField.value = quill.root.innerHTML;
+            
+            return true;
+        };
+    });
+</script> 

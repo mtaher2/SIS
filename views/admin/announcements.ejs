@@ -17,12 +17,46 @@
         </div>
     </div>
 
+
     <!-- Spam filter controls -->
     <div class="mb-4">
         <div class="btn-group" role="group">
             <a href="/admin/announcements" class="btn btn-outline-primary <%= !filters || !filters.is_spam ? 'active' : '' %>">All</a>
             <a href="/admin/announcements?filter=regular" class="btn btn-outline-success <%= filters && filters.is_spam === false ? 'active' : '' %>">Regular</a>
             <a href="/admin/announcements?filter=spam" class="btn btn-outline-danger <%= filters && filters.is_spam === true ? 'active' : '' %>">Spam</a>
+
+    <!-- Search and Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form action="/admin/announcements" method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label for="search" class="form-label">Search</label>
+                    <input type="text" class="form-control" id="search" name="search" 
+                           placeholder="Title or content" value="<%= locals.search || '' %>">
+                </div>
+                <div class="col-md-3">
+                    <label for="target_type" class="form-label">Target</label>
+                    <select class="form-select" id="target_type" name="target_type">
+                        <option value="">All Targets</option>
+                        <option value="all" <%= locals.target_type === 'all' ? 'selected' : '' %>>All Users</option>
+                        <option value="student" <%= locals.target_type === 'student' ? 'selected' : '' %>>Students</option>
+                        <option value="instructor" <%= locals.target_type === 'instructor' ? 'selected' : '' %>>Instructors</option>
+                        <option value="course" <%= locals.target_type === 'course' ? 'selected' : '' %>>Courses</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">All Statuses</option>
+                        <option value="active" <%= locals.status === 'active' ? 'selected' : '' %>>Active</option>
+                        <option value="inactive" <%= locals.status === 'inactive' ? 'selected' : '' %>>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+            </form>
+            
         </div>
     </div>
 

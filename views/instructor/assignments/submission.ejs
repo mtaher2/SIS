@@ -1,0 +1,306 @@
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header Section -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">Submission Details</h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="/instructor/courses">Courses</a></li>
+                            <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>"><%= course.course_name %></a></li>
+                            <li class="breadcrumb-item"><a href="/instructor/modules/<%= module.module_id %>"><%= module.module_name %></a></li>
+                            <li class="breadcrumb-item"><a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>/submissions">Submissions</a></li>
+                            <li class="breadcrumb-item active" aria-current="page"><%= submission.first_name %> <%= submission.last_name %></li>
+                        </ol>
+                    </nav>
+                </div>
+                <div>
+                    <a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>/submissions" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Submissions
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Submission Content -->
+                <div class="col-lg-8">
+                    <!-- Student Info Card -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="avatar avatar-lg me-3">
+                                    <span class="avatar-initial rounded-circle bg-primary">
+                                        <%= submission.first_name.charAt(0) %><%= submission.last_name.charAt(0) %>
+                                    </span>
+                                </div>
+                                <div>
+                                    <h5 class="mb-1"><%= submission.first_name %> <%= submission.last_name %></h5>
+                                    <p class="text-muted mb-0"><%= submission.email %></p>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Submission Date:</strong></p>
+                                    <p class="mb-3">
+                                        <%= new Date(submission.submitted_at).toLocaleString() %>
+                                        <% if (submission.late) { %>
+                                            <span class="badge bg-warning text-dark ms-2">Late</span>
+                                        <% } %>
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Status:</strong></p>
+                                    <p class="mb-3">
+                                        <% if (submission.graded) { %>
+                                            <span class="badge bg-success">Graded</span>
+                                        <% } else { %>
+                                            <span class="badge bg-info">Submitted</span>
+                                        <% } %>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submission Content -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Submission Content</h5>
+                        </div>
+                        <div class="card-body">
+                            <% if (submission.file_url) { %>
+                                <div class="submission-preview p-3 bg-light rounded">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <a href="<%= submission.file_url %>" class="d-flex align-items-center text-decoration-none" target="_blank">
+                                            <% 
+                                            const fileType = submission.file_type ? submission.file_type.toLowerCase() : '';
+                                            let iconClass = 'fas fa-file text-secondary';
+                                            
+                                            if (fileType.includes('pdf')) {
+                                                iconClass = 'fas fa-file-pdf text-danger';
+                                            } else if (fileType.includes('doc')) {
+                                                iconClass = 'fas fa-file-word text-primary';
+                                            } else if (fileType.includes('ppt')) {
+                                                iconClass = 'fas fa-file-powerpoint text-warning';
+                                            } else if (fileType.includes('xls')) {
+                                                iconClass = 'fas fa-file-excel text-success';
+                                            } else if (fileType.includes('zip') || fileType.includes('rar')) {
+                                                iconClass = 'fas fa-file-archive text-secondary';
+                                            } else if (fileType.includes('jpg') || fileType.includes('jpeg') || fileType.includes('png') || fileType.includes('gif')) {
+                                                iconClass = 'fas fa-file-image text-info';
+                                            }
+                                            %>
+                                            <i class="<%= iconClass %> fa-2x me-3"></i>
+                                            <div>
+                                                <div class="fw-bold"><%= submission.file_name || 'Submitted File' %></div>
+                                                <small class="text-muted">Click to view/download the file</small>
+                                            </div>
+                                        </a>
+                                    </div>
+                                    <div class="submission-meta">
+                                        <div class="d-flex flex-wrap gap-3 text-muted small">
+                                            <div>
+                                                <i class="fas fa-clock me-1"></i>
+                                                Submitted: <%= new Date(submission.submitted_at).toLocaleString() %>
+                                                <% if (submission.is_late) { %>
+                                                    <span class="badge bg-warning text-dark ms-2">Late</span>
+                                                <% } %>
+                                            </div>
+                                            <% if (submission.file_type) { %>
+                                            <div>
+                                                <i class="fas fa-file-alt me-1"></i>
+                                                File type: <%= submission.file_type.toUpperCase() %>
+                                            </div>
+                                            <% } %>
+                                            <div>
+                                                <i class="fas fa-download me-1"></i>
+                                                <a href="<%= submission.file_url %>" class="text-decoration-none" download>Download</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% } else { %>
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    No file was uploaded with this submission.
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <!-- Previous Submissions -->
+                    <% if (submission.submission_count > 1) { %>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Previous Submissions</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Status</th>
+                                                <th>Grade</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <% submission.previous_submissions.forEach(prev => { %>
+                                                <tr>
+                                                    <td><%= new Date(prev.submitted_at).toLocaleString() %></td>
+                                                    <td>
+                                                        <% if (prev.graded) { %>
+                                                            <span class="badge bg-success">Graded</span>
+                                                        <% } else { %>
+                                                            <span class="badge bg-info">Submitted</span>
+                                                        <% } %>
+                                                    </td>
+                                                    <td>
+                                                        <% if (prev.graded) { %>
+                                                            <%= prev.score %> / <%= assignment.points_possible %>
+                                                        <% } else { %>
+                                                            -
+                                                        <% } %>
+                                                    </td>
+                                                    <td>
+                                                        <a href="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>/submissions/<%= prev.submission_id %>" 
+                                                           class="btn btn-sm btn-outline-primary">
+                                                            <i class="fas fa-eye"></i> View
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            <% }) %>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    <% } %>
+                </div>
+
+                <!-- Grading Panel -->
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Grade Submission</h5>
+                        </div>
+                        <div class="card-body">
+                            <form action="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>/submissions/<%= submission.submission_id %>/grade" method="POST">
+                                <div class="mb-3">
+                                    <label class="form-label">Score</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="score" min="0" max="<%= assignment.points_possible %>" step="0.1" value="<%= submission.score %>" required>
+                                        <span class="input-group-text">/ <%= assignment.points_possible %></span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Feedback</label>
+                                    <textarea class="form-control" name="feedback" rows="4"><%= submission.feedback %></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-save me-2"></i>
+                                    <%= submission.graded ? 'Update Grade' : 'Save Grade' %>
+                                </button>
+                                
+                                <% if (submission.graded) { %>
+                                <div class="alert alert-success mt-3">
+                                    <small>
+                                        <i class="fas fa-check-circle me-1"></i>
+                                        Graded by <%= submission.graded_by_name || 'Instructor' %> on 
+                                        <%= new Date(submission.graded_at).toLocaleString() %>
+                                    </small>
+                                </div>
+                                <% } %>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Assignment Details -->
+                    <div class="card mt-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Assignment Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Assignment:</strong> <%= assignment.title %></p>
+                            <p><strong>Points:</strong> <%= assignment.points_possible %></p>
+                            <p><strong>Due Date:</strong> <%= new Date(assignment.due_date).toLocaleString() %></p>
+                            <p><strong>Submission Type:</strong> 
+                                <% if (assignment.submission_type === 'file_upload') { %>
+                                    File Upload
+                                <% } else if (assignment.submission_type === 'text') { %>
+                                    Text Entry
+                                <% } else if (assignment.submission_type === 'url') { %>
+                                    Website URL
+                                <% } else { %>
+                                    <%= assignment.submission_type %>
+                                <% } %>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Update Grade Modal -->
+<div class="modal fade" id="updateGradeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Grade</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/instructor/modules/<%= module.module_id %>/assignments/<%= assignment.assignment_id %>/submissions/<%= submission.submission_id %>/grade" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Score</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="score" min="0" max="<%= assignment.points_possible %>" step="0.1" value="<%= submission.score %>" required>
+                            <span class="input-group-text">/ <%= assignment.points_possible %></span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Feedback</label>
+                        <textarea class="form-control" name="feedback" rows="4"><%= submission.feedback %></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Grade</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.avatar {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    color: white;
+}
+
+.avatar-initial {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.submission-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.table > :not(caption) > * > * {
+    padding: 0.75rem;
+}
+</style>

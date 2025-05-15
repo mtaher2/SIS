@@ -1,0 +1,398 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">Create Assignment</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses">My Courses</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>"><%= course.title %></a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>/modules">Modules</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/modules/<%= module.module_id %>/assignments">Assignments</a></li>
+                    <li class="breadcrumb-item active">Create</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="/instructor/modules/<%= module.module_id %>/assignments" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Back to Assignments
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i> Create Assignment</h5>
+        </div>
+        <div class="card-body">
+            <form action="/instructor/modules/<%= module.module_id %>/assignments" method="POST">
+                <!-- Assignment Details -->
+                <div class="mb-3">
+                    <label for="title" class="form-label">Assignment Title</label>
+                    <input type="text" class="form-control" id="title" name="title" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="instructions" class="form-label">Instructions</label>
+                    <!-- Hidden textarea to store the HTML content -->
+                    <textarea id="instructions" name="instructions" style="display: none;"></textarea>
+                    <!-- Quill editor container -->
+                    <div id="editor-container" style="height: 300px; border: 1px solid #ccc; border-radius: 4px;"></div>
+                    <div class="form-text">Provide detailed instructions for this assignment.</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="submission_type" class="form-label">Submission Type</label>
+                        <select class="form-select" id="submission_type" name="submission_type" required>
+                            <option value="file">File Upload</option>
+                            <option value="text">Text Entry</option>
+                            <option value="url">Website URL</option>
+                            <option value="media">Media Recording</option>
+                            <option value="external">External Tool</option>
+                            <option value="none">No Submission</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="points_possible" class="form-label">Points Possible</label>
+                        <input type="number" class="form-control" id="points_possible" name="points_possible" min="0" value="100" required>
+                    </div>
+                </div>
+                
+                <div class="mb-3 file-types-container">
+                    <label for="allowed_file_types" class="form-label">Allowed File Types</label>
+                    <input type="text" class="form-control" id="allowed_file_types" name="allowed_file_types" placeholder="pdf,doc,docx,ppt,pptx,xls,xlsx,jpg,png,zip">
+                    <div class="form-text">Comma-separated list of file extensions (without dots). Leave blank to allow all types.</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="due_date" class="form-label">Due Date</label>
+                        <input type="datetime-local" class="form-control" id="due_date" name="due_date">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="available_from" class="form-label">Available From</label>
+                        <input type="datetime-local" class="form-control" id="available_from" name="available_from">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="available_until" class="form-label">Available Until</label>
+                        <input type="datetime-local" class="form-control" id="available_until" name="available_until">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="allow_late_submissions" name="allow_late_submissions" value="true" checked>
+                        <label class="form-check-label" for="allow_late_submissions">
+                            Allow late submissions
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3 late-submission-container">
+                    <label for="late_submission_deduction" class="form-label">Late Submission Deduction (%)</label>
+                    <input type="number" class="form-control" id="late_submission_deduction" name="late_submission_deduction" min="0" max="100" value="10">
+                    <div class="form-text">Percentage of points to deduct for late submissions.</div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="published" name="published" value="true">
+                        <label class="form-check-label" for="published">
+                            Publish assignment immediately
+                        </label>
+                        <div class="form-text">If unchecked, the assignment will be saved as a draft.</div>
+                    </div>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Create Assignment
+                    </button>
+                    <a href="/instructor/modules/<%= module.module_id %>/assignments" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Include Quill.js library and styles -->
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+
+<!-- Custom CSS for Quill file button -->
+<style>
+    .ql-file::after {
+        content: "📎";
+        font-size: 18px;
+    }
+    
+    .embedded-file {
+        margin: 10px 0;
+        padding: 8px 12px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    
+    .embedded-file .file-link {
+        text-decoration: none;
+        color: #0d6efd;
+        display: flex;
+        align-items: center;
+    }
+    
+    .embedded-file .file-link:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<!-- File upload handling -->
+<div id="file-upload-container">
+    <div class="modal fade" id="fileUploadModal" tabindex="-1" aria-labelledby="fileUploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="fileUploadModalLabel">Upload File</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="file-upload-form">
+                        <div class="mb-3">
+                            <label for="file-upload" class="form-label">Select File</label>
+                            <input type="file" class="form-control" id="file-upload" name="file">
+                        </div>
+                        <div class="progress mb-3" style="display: none;">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="upload-file-btn">Upload</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Quill editor
+        const quill = new Quill('#editor-container', {
+            modules: {
+                toolbar: {
+                    container: [
+                        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ 'color': [] }, { 'background': [] }],
+                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                        [{ 'align': [] }],
+                        ['link', 'image', 'video'],
+                        ['file'], // Custom button for file upload
+                        ['clean']
+                    ]
+                }
+            },
+            placeholder: 'Compose assignment instructions here...',
+            theme: 'snow'  // or 'bubble'
+        });
+        
+        // Add file button to toolbar and custom handler
+        const toolbar = quill.getModule('toolbar');
+        toolbar.addHandler('file', function() {
+            try {
+                // Get modal element
+                const fileUploadModal = document.getElementById('fileUploadModal');
+                if (!fileUploadModal) {
+                    console.error('Modal element not found');
+                    return;
+                }
+                
+                // Try to get Bootstrap Modal instance
+                let bootstrapModal = bootstrap.Modal.getInstance(fileUploadModal);
+                if (!bootstrapModal) {
+                    // Create new instance if it doesn't exist
+                    bootstrapModal = new bootstrap.Modal(fileUploadModal);
+                }
+                
+                // Show modal
+                bootstrapModal.show();
+            } catch (error) {
+                console.error('Error showing modal:', error);
+                alert('Could not open file upload dialog. Please try again.');
+            }
+        });
+        
+        // Clear duplicate handler in the Quill initialization
+        delete quill.getModule('toolbar').handlers['file'];
+        
+        // Handle file upload
+        document.getElementById('upload-file-btn').addEventListener('click', function() {
+            const fileInput = document.getElementById('file-upload');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+            
+            // Check file size (10MB limit)
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size exceeds the limit (10MB)');
+                return;
+            }
+            
+            // Check file type
+            const allowedExtensions = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.gif', '.txt', '.zip'];
+            const fileName = file.name.toLowerCase();
+            const fileExt = '.' + fileName.split('.').pop();
+            
+            if (!allowedExtensions.includes(fileExt)) {
+                alert('File type not allowed. Allowed types: ' + allowedExtensions.join(', '));
+                return;
+            }
+            
+            // Show progress bar
+            const progressBar = document.querySelector('.progress');
+            const progressBarInner = progressBar.querySelector('.progress-bar');
+            progressBar.style.display = 'block';
+            progressBarInner.style.width = '0%';
+            
+            // Create FormData
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // Use fetch API for simplicity
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Server returned status ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Insert file link into editor
+                    const fileIcon = getFileIcon(data.fileName);
+                    const range = quill.getSelection() || { index: quill.getLength(), length: 0 };
+                    
+                    quill.insertEmbed(range.index, 'html', 
+                        `<div class="embedded-file">
+                            <a href="${data.location}" target="_blank" class="file-link">
+                                <i class="${fileIcon} me-1"></i> ${data.fileName}
+                            </a>
+                        </div>`
+                    );
+                    
+                    // Close the modal using Bootstrap API
+                    try {
+                        const modalElement = document.getElementById('fileUploadModal');
+                        // Try Bootstrap 5 method first
+                        let bsModal = bootstrap.Modal.getInstance(modalElement);
+                        if (bsModal) {
+                            bsModal.hide();
+                        } else {
+                            // Try creating a new instance and then hiding it
+                            bsModal = new bootstrap.Modal(modalElement);
+                            bsModal.hide();
+                        }
+                    } catch (err) {
+                        console.error('Error hiding modal:', err);
+                        // Manual fallback
+                        document.getElementById('fileUploadModal').style.display = 'none';
+                        document.querySelector('.modal-backdrop')?.remove();
+                        document.body.classList.remove('modal-open');
+                        document.body.style.overflow = '';
+                        document.body.style.paddingRight = '';
+                    }
+                    
+                    // Reset form and progress
+                    document.getElementById('file-upload-form').reset();
+                    progressBar.style.display = 'none';
+                    progressBarInner.style.width = '0%';
+                } else {
+                    alert('Error uploading file: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error uploading file:', error);
+                alert('Error uploading file: ' + error.message);
+                progressBar.style.display = 'none';
+            });
+        });
+        
+        // Function to get appropriate icon for file type
+        function getFileIcon(filename) {
+            const extension = filename.split('.').pop().toLowerCase();
+            
+            const iconMap = {
+                'pdf': 'fas fa-file-pdf',
+                'doc': 'fas fa-file-word',
+                'docx': 'fas fa-file-word',
+                'xls': 'fas fa-file-excel',
+                'xlsx': 'fas fa-file-excel',
+                'ppt': 'fas fa-file-powerpoint',
+                'pptx': 'fas fa-file-powerpoint',
+                'jpg': 'fas fa-file-image',
+                'jpeg': 'fas fa-file-image',
+                'png': 'fas fa-file-image',
+                'gif': 'fas fa-file-image',
+                'zip': 'fas fa-file-archive',
+                'rar': 'fas fa-file-archive',
+                'txt': 'fas fa-file-alt'
+            };
+            
+            return iconMap[extension] || 'fas fa-file';
+        }
+        
+        // Handle conditional display of file types input
+        const submissionTypeSelect = document.getElementById('submission_type');
+        const fileTypesContainer = document.querySelector('.file-types-container');
+        
+        submissionTypeSelect.addEventListener('change', function() {
+            if (this.value === 'file') {
+                fileTypesContainer.style.display = 'block';
+            } else {
+                fileTypesContainer.style.display = 'none';
+            }
+        });
+        
+        // Handle conditional display of late submission deduction
+        const allowLateSubmissions = document.getElementById('allow_late_submissions');
+        const lateSubmissionContainer = document.querySelector('.late-submission-container');
+        
+        allowLateSubmissions.addEventListener('change', function() {
+            if (this.checked) {
+                lateSubmissionContainer.style.display = 'block';
+            } else {
+                lateSubmissionContainer.style.display = 'none';
+            }
+        });
+        
+        // Handle form submission
+        const form = document.querySelector('form');
+        form.onsubmit = function() {
+            // Get editor content and update hidden textarea
+            const instructionsField = document.getElementById('instructions');
+            instructionsField.value = quill.root.innerHTML;
+            
+            return true;
+        };
+        
+        // Set up initial states
+        if (submissionTypeSelect.value !== 'file') {
+            fileTypesContainer.style.display = 'none';
+        }
+        
+        if (!allowLateSubmissions.checked) {
+            lateSubmissionContainer.style.display = 'none';
+        }
+    });
+</script> 

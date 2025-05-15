@@ -1,0 +1,186 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">Course Students</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses">My Courses</a></li>
+                    <li class="breadcrumb-item"><a href="/instructor/courses/<%= course.course_id %>"><%= course.course_code %></a></li>
+                    <li class="breadcrumb-item active">Students</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users me-2"></i> Students Enrolled in <%= course.title %>
+                    </h5>
+                    <a href="/instructor/courses/<%= course.course_id %>/add-students" class="btn btn-light btn-sm">
+                        <i class="fas fa-user-plus me-1"></i> Add Students
+                    </a>
+                </div>
+
+                <div class="card-body">
+                    <% if (locals.success_msg && success_msg) { %>
+                        <div class="alert alert-success">
+                            <%= success_msg %>
+                        </div>
+                    <% } %>
+                    
+                    <% if (locals.error_msg && error_msg) { %>
+                        <div class="alert alert-danger">
+                            <%= error_msg %>
+                        </div>
+                    <% } %>
+
+                    <!-- Search Form -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">Search Students</h6>
+                        </div>
+                        <div class="card-body">
+                            <form action="/instructor/courses/<%= course.course_id %>/students" method="GET" class="row g-3">
+                                <div class="col-md-6">
+                                    <input type="text" class="form-control" id="search" name="search" 
+                                        placeholder="Search by name, email, or student ID" value="<%= locals.search || '' %>">
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select" id="status" name="status">
+                                        <option value="">All Status</option>
+                                        <option value="active" <%= locals.status === 'active' ? 'selected' : '' %>>Active</option>
+                                        <option value="dropped" <%= locals.status === 'dropped' ? 'selected' : '' %>>Dropped</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="fas fa-search me-2"></i> Search
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Enrolled Students -->
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Enrolled Students</h6>
+                            <span class="badge bg-info"><%= students ? students.length : 0 %> students</span>
+                        </div>
+                        <div class="card-body">
+                            <% if (students && students.length > 0) { %>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Student ID</th>
+                                                <th>Email</th>
+                                                <th>Status</th>
+                                                <th>Enrollment Date</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <% students.forEach(student => { %>
+                                                <tr>
+                                                    <td><%= student.first_name %> <%= student.last_name %></td>
+                                                    <td><%= student.student_id || 'N/A' %></td>
+                                                    <td><%= student.email %></td>
+                                                    <td>
+                                                        <% if (student.status === 'active') { %>
+                                                            <span class="badge bg-success">Active</span>
+                                                        <% } else if (student.status === 'dropped') { %>
+                                                            <span class="badge bg-danger">Dropped</span>
+                                                        <% } else { %>
+                                                            <span class="badge bg-secondary"><%= student.status %></span>
+                                                        <% } %>
+                                                    </td>
+                                                    <td><%= new Date(student.enrollment_date).toLocaleDateString() %></td>
+                                                    <td>
+                                                        <% if (student.status === 'active') { %>
+                                                            <button type="button" class="btn btn-sm btn-danger" 
+                                                                    data-bs-toggle="modal" 
+                                                                    data-bs-target="#removeStudentModal" 
+                                                                    data-student-id="<%= student.user_id %>"
+                                                                    data-student-name="<%= student.first_name %> <%= student.last_name %>">
+                                                                <i class="fas fa-user-minus"></i> Remove
+                                                            </button>
+                                                        <% } else if (student.status === 'dropped') { %>
+                                                            <form action="/instructor/courses/<%= course.course_id %>/add-students" method="POST" class="d-inline">
+                                                                <input type="hidden" name="student_ids[]" value="<%= student.user_id %>">
+                                                                <button type="submit" class="btn btn-sm btn-success">
+                                                                    <i class="fas fa-user-plus"></i> Re-add
+                                                                </button>
+                                                            </form>
+                                                        <% } %>
+                                                    </td>
+                                                </tr>
+                                            <% }); %>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <% } else { %>
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i> No students found in this course.
+                                    <a href="/instructor/courses/<%= course.course_id %>/add-students" class="alert-link">Add students</a> to get started.
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Remove Student Modal -->
+<div class="modal fade" id="removeStudentModal" tabindex="-1" aria-labelledby="removeStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="removeStudentModalLabel">Remove Student</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <strong id="studentName"></strong> from this course?</p>
+                <p class="text-danger"><small>This action cannot be undone. The student will lose access to all course materials.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="removeStudentForm" action="" method="POST">
+                    <button type="submit" class="btn btn-danger">Remove Student</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const removeStudentModal = document.getElementById('removeStudentModal');
+        if (removeStudentModal) {
+            removeStudentModal.addEventListener('show.bs.modal', function(event) {
+                const button = event.relatedTarget;
+                const studentId = button.getAttribute('data-student-id');
+                const studentName = button.getAttribute('data-student-name');
+                
+                // Update the modal's content
+                const studentNameElement = document.getElementById('studentName');
+                if (studentNameElement) {
+                    studentNameElement.textContent = studentName;
+                }
+                
+                // Update form action
+                const form = document.getElementById('removeStudentForm');
+                if (form) {
+                    form.action = `/instructor/courses/<%= course.course_id %>/students/${studentId}/remove`;
+                }
+            });
+        }
+    });
+</script> 

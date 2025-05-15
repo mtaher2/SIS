@@ -106,7 +106,12 @@ class Course {
         try {
             let query = `
                 SELECT c.*, s.semester_name, s.start_date, s.end_date,
-                    (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = c.course_id) AS enrolled_students
+                    (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = c.course_id) AS enrolled_students,
+                    (SELECT CONCAT(u.first_name, ' ', u.last_name) 
+                     FROM course_instructors ci 
+                     JOIN users u ON ci.instructor_id = u.user_id 
+                     WHERE ci.course_id = c.course_id 
+                     LIMIT 1) AS instructor_name
                 FROM courses c
                 JOIN semesters s ON c.semester_id = s.semester_id
             `;
@@ -134,6 +139,30 @@ class Course {
             return rows;
         } catch (error) {
             console.error('Error finding courses:', error);
+            throw error;
+        }
+    }
+
+    // Search courses by name, code, or description
+    static async search(searchTerm, filters = {}) {
+        try {
+            // First get all courses with the given filters
+            const courses = await this.findAll(filters);
+            
+            // If no search term, return all courses
+            if (!searchTerm) {
+                return courses;
+            }
+            
+            // Apply search filter (case insensitive)
+            const searchTermLower = searchTerm.toLowerCase();
+            return courses.filter(course => 
+                course.title.toLowerCase().includes(searchTermLower) || 
+                course.course_code.toLowerCase().includes(searchTermLower) ||
+                (course.description && course.description.toLowerCase().includes(searchTermLower))
+            );
+        } catch (error) {
+            console.error('Error searching courses:', error);
             throw error;
         }
     }
@@ -180,18 +209,42 @@ class Course {
     // Get all instructors for a course
     static async getInstructors(courseId) {
         try {
-            const [rows] = await db.query(
-                `SELECT u.user_id, u.first_name, u.last_name, u.email, u.username,
-                    ip.department, ip.office_location, ip.office_hours,
-                    ci.assignment_id, ci.assigned_at
-                FROM course_instructors ci
-                JOIN users u ON ci.instructor_id = u.user_id
-                JOIN instructor_profiles ip ON u.user_id = ip.user_id
-                WHERE ci.course_id = ?
-                ORDER BY u.last_name, u.first_name`,
-                [courseId]
-            );
-            return rows;
+            // Check if instructor_profiles table exists or has entries first
+            let hasProfiles = true;
+            try {
+                const [profileCheck] = await db.query('SELECT 1 FROM instructor_profiles LIMIT 1');
+                if (profileCheck.length === 0) {
+                    hasProfiles = false;
+                }
+            } catch (err) {
+                // Table might not exist
+                hasProfiles = false;
+            }
+            
+            let query;
+            if (hasProfiles) {
+                query = `
+                    SELECT u.user_id, u.first_name, u.last_name, u.email, u.username,
+                        ip.department, ip.office_location, ip.office_hours,
+                        ci.assignment_id, ci.assigned_at
+                    FROM course_instructors ci
+                    JOIN users u ON ci.instructor_id = u.user_id
+                    LEFT JOIN instructor_profiles ip ON u.user_id = ip.user_id
+                    WHERE ci.course_id = ?
+                    ORDER BY u.last_name, u.first_name`;
+            } else {
+                query = `
+                    SELECT u.user_id, u.first_name, u.last_name, u.email, u.username,
+                        NULL as department, NULL as office_location, NULL as office_hours,
+                        ci.assignment_id, ci.assigned_at
+                    FROM course_instructors ci
+                    JOIN users u ON ci.instructor_id = u.user_id
+                    WHERE ci.course_id = ?
+                    ORDER BY u.last_name, u.first_name`;
+            }
+            
+            const [rows] = await db.query(query, [courseId]);
+            return [rows, hasProfiles];
         } catch (error) {
             console.error('Error getting course instructors:', error);
             throw error;
@@ -330,6 +383,73 @@ class Course {
             return rows;
         } catch (error) {
             console.error('Error getting course assignments:', error);
+            throw error;
+        }
+    }
+
+    // Get students enrolled in a course
+    static async getEnrolledStudents(courseId, filters = {}) {
+        try {
+            // First check if student_profiles table exists
+            let hasStudentProfiles = true;
+            try {
+                await db.query('SELECT 1 FROM student_profiles LIMIT 1');
+            } catch (err) {
+                if (err.code === 'ER_NO_SUCH_TABLE') {
+                    hasStudentProfiles = false;
+                }
+            }
+            
+            let query;
+            if (hasStudentProfiles) {
+                query = `
+                    SELECT u.user_id, u.first_name, u.last_name, u.email, u.username, u.is_active, 
+                           sp.student_id, e.enrollment_id, e.status, e.enrollment_date,
+                           0 as submission_count
+                    FROM enrollments e
+                    JOIN users u ON e.student_id = u.user_id
+                    JOIN student_profiles sp ON u.user_id = sp.user_id
+                `;
+            } else {
+                query = `
+                    SELECT u.user_id, u.first_name, u.last_name, u.email, u.username, u.is_active,
+                           CONCAT('STU', u.user_id) as student_id, e.enrollment_id, e.status, e.enrollment_date,
+                           0 as submission_count
+                    FROM enrollments e
+                    JOIN users u ON e.student_id = u.user_id
+                `;
+            }
+            
+            const params = [];
+            const conditions = ['e.course_id = ?'];
+            params.push(courseId);
+            
+            // Apply status filter
+            if (filters.status) {
+                conditions.push('e.status = ?');
+                params.push(filters.status);
+            }
+            
+            // Apply search filter
+            if (filters.search) {
+                if (hasStudentProfiles) {
+                    conditions.push('(u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR u.username LIKE ? OR sp.student_id LIKE ?)');
+                    const searchTerm = `%${filters.search}%`;
+                    params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+                } else {
+                    conditions.push('(u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR u.username LIKE ?)');
+                    const searchTerm = `%${filters.search}%`;
+                    params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+                }
+            }
+            
+            query += ` WHERE ${conditions.join(' AND ')}`;
+            query += ' ORDER BY u.first_name, u.last_name';
+            
+            const [rows] = await db.query(query, params);
+            return rows;
+        } catch (error) {
+            console.error('Error getting enrolled students:', error);
             throw error;
         }
     }

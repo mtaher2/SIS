@@ -13,7 +13,17 @@ const createUploadDir = (dirPath) => {
 // Set up multer storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '../public/storage');
+        // Determine appropriate directory based on the file type or route
+        let uploadDir;
+        
+        if (file.fieldname === 'profile_image') {
+            uploadDir = path.join(__dirname, '../public/storage/profile_images');
+        } else if (file.fieldname === 'submissionFile') {
+            uploadDir = path.join(__dirname, '../public/storage/assignments');
+        } else {
+            uploadDir = path.join(__dirname, '../public/storage');
+        }
+        
         createUploadDir(uploadDir);
         cb(null, uploadDir);
     },

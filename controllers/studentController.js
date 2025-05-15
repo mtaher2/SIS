@@ -5,6 +5,8 @@ const Announcement = require('../models/Announcement');
 const Message = require('../models/Message');
 const { validationResult } = require('express-validator');
 const db = require('../db');
+const fs = require('fs');
+const path = require('path');
 
 // Student dashboard
 exports.getDashboard = async (req, res) => {
@@ -161,23 +163,154 @@ exports.getCourse = async (req, res) => {
         const course = await Course.findById(courseId);
         
         // Get course instructors
-        const instructors = await Course.getInstructors(courseId);
+        const [instructors] = await Course.getInstructors(courseId);
+        
+        // Get course modules
+        const [modules] = await db.query(
+            `SELECT * FROM modules 
+             WHERE course_id = ? AND published = 1
+             ORDER BY position ASC`,
+            [courseId]
+        );
         
         // Get course materials
         const materials = await Course.getMaterials(courseId);
         
-        // Get assignments
+        // Get module pages - order by created_at
+        const [pages] = await db.query(
+            `SELECT p.*, m.title AS module_title 
+             FROM pages p
+             JOIN modules m ON p.module_id = m.module_id
+             WHERE m.course_id = ? AND p.published = 1
+             ORDER BY m.position ASC, p.created_at ASC`,
+            [courseId]
+        );
+        
+        // Get assignments by module - without joining on module_id
+        const [moduleAssignments] = await db.query(
+            `SELECT a.* 
+             FROM assignments a
+             WHERE a.course_id = ? 
+             ORDER BY a.due_date ASC`,
+            [courseId]
+        );
+        
+        // Group materials by module
+        const materialsByModule = {};
+        
+        // First, add all modules as keys
+        if (modules && modules.length > 0) {
+            modules.forEach(module => {
+                materialsByModule[module.title] = [];
+            });
+        }
+        
+        // Add a "General Materials" group for materials without modules
+        materialsByModule["General Materials"] = [];
+        
+        // Assign all materials to General Materials for now
+        // (In a real implementation, we'd assign them to specific modules)
+        if (materials && materials.length > 0) {
+            materials.forEach(material => {
+                materialsByModule["General Materials"].push(material);
+            });
+        }
+        
+        // Create a pages by module object
+        const pagesByModule = {};
+        
+        // Create an assignments by module object
+        const assignmentsByModule = {};
+        
+        // First, add all modules as keys
+        if (modules && modules.length > 0) {
+            modules.forEach(module => {
+                pagesByModule[module.title] = [];
+                assignmentsByModule[module.title] = [];
+            });
+        }
+        
+        // Now assign pages to their modules
+        if (pages && pages.length > 0) {
+            pages.forEach(page => {
+                if (!pagesByModule[page.module_title]) {
+                    pagesByModule[page.module_title] = [];
+                }
+                pagesByModule[page.module_title].push(page);
+            });
+        }
+        
+        // Create a simple module_assignment mapping to organize assignments by module
+        // This is a temporary solution until a proper module_assignment table exists in the database
+        const moduleAssignmentMap = {};
+        
+        // In a real system, this would come from a database table
+        // For now, we'll distribute assignments to modules evenly for demonstration
+        if (modules && modules.length > 0 && moduleAssignments && moduleAssignments.length > 0) {
+            // Assign each assignment to a module in round-robin fashion
+            moduleAssignments.forEach((assignment, index) => {
+                const moduleIndex = index % modules.length;
+                const moduleId = modules[moduleIndex].module_id;
+                
+                if (!moduleAssignmentMap[moduleId]) {
+                    moduleAssignmentMap[moduleId] = [];
+                }
+                
+                moduleAssignmentMap[moduleId].push(assignment);
+            });
+        }
+        
+        // Assign assignments to their modules based on the mapping
+        if (modules && modules.length > 0) {
+            modules.forEach(module => {
+                const moduleId = module.module_id;
+                if (moduleAssignmentMap[moduleId] && moduleAssignmentMap[moduleId].length > 0) {
+                    if (!assignmentsByModule[module.title]) {
+                        assignmentsByModule[module.title] = [];
+                    }
+                    
+                    moduleAssignmentMap[moduleId].forEach(assignment => {
+                        assignmentsByModule[module.title].push(assignment);
+                    });
+                }
+            });
+        }
+        
+        // Also keep the General Assignments for assignments not assigned to modules
+        // This is optional - we can comment this out if we want all assignments to be under modules
+        /* 
+        if (moduleAssignments && moduleAssignments.length > 0) {
+            // Create General Assignments category if it doesn't exist
+            if (!assignmentsByModule["General Assignments"]) {
+                assignmentsByModule["General Assignments"] = [];
+            }
+            
+            // Add all assignments to General Assignments section
+            moduleAssignments.forEach(assignment => {
+                assignmentsByModule["General Assignments"].push(assignment);
+            });
+        }
+        */
+        
+        // Get assignments (for the assignments section at the bottom)
         const assignments = await Course.getAssignments(courseId);
         
         // Get student's grades for this course
         const [grades] = await db.query(
-            `SELECT g.*, a.title AS assignment_title, a.max_points, a.weight_percentage
-            FROM grades g
-            JOIN assignments a ON g.assignment_id = a.assignment_id
-            WHERE g.student_id = ? AND a.course_id = ?`,
-            [studentId, courseId]
+            `SELECT s.*, a.points_possible as max_points
+             FROM enhanced_submissions s
+             JOIN enhanced_assignments a ON s.assignment_id = a.assignment_id
+             WHERE s.assignment_id = ? AND s.student_id = ? AND s.score IS NOT NULL`,
+            [courseId, studentId]
         );
         
+        const grade = grades.length > 0 ? {
+            points: grades[0].score,
+            max_points: grades[0].max_points,
+            feedback: grades[0].feedback,
+            graded_at: grades[0].graded_at
+        } : null;
+
         // Get course announcements
         const announcements = await Announcement.findAll({
             target_type: 'course',
@@ -190,7 +323,12 @@ exports.getCourse = async (req, res) => {
             user: req.session.user,
             course,
             instructors,
+            modules,
             materials,
+            materialsByModule,
+            pages,
+            pagesByModule,
+            assignmentsByModule,
             assignments,
             grades,
             announcements
@@ -199,6 +337,341 @@ exports.getCourse = async (req, res) => {
         console.error('Error getting course details:', error);
         req.flash('error_msg', 'An error occurred while retrieving course details');
         res.redirect('/student/courses');
+    }
+};
+
+// View assignment details
+exports.getAssignment = async (req, res) => {
+    try {
+        const assignmentId = req.params.id;
+        const studentId = req.session.user.user_id;
+        
+        // Get assignment details
+        const [assignments] = await db.query(
+            `SELECT a.*, m.module_id, m.title AS module_title, c.course_id, c.course_code, c.title AS course_title, c.credit_hours 
+             FROM enhanced_assignments a
+             JOIN modules m ON a.module_id = m.module_id
+             JOIN courses c ON m.course_id = c.course_id
+             WHERE a.assignment_id = ?`,
+            [assignmentId]
+        );
+        
+        if (assignments.length === 0) {
+            console.error(`Assignment not found: ID ${assignmentId}`);
+            req.flash('error_msg', 'Assignment not found');
+            return res.redirect('/student/courses');
+        }
+        
+        const assignment = assignments[0];
+        const courseId = assignment.course_id;
+        
+        // Check if student is enrolled in this course
+        const courses = await Student.getEnrolledCourses(studentId);
+        const isEnrolled = courses.some(course => course.course_id == courseId);
+        
+        if (!isEnrolled) {
+            console.error(`Access denied: Student ${studentId} not enrolled in course ${courseId}`);
+            req.flash('error_msg', 'You do not have access to this assignment');
+            return res.redirect('/student/courses');
+        }
+        
+        // Get course details
+        const course = await Course.findById(courseId);
+        
+        // Get student's submission if exists
+        const [submissions] = await db.query(
+            `SELECT s.*, 
+                    CASE 
+                        WHEN s.file_url IS NOT NULL THEN s.file_url
+                        WHEN s.content IS NOT NULL THEN NULL
+                        ELSE NULL
+                    END as file_url,
+                    CASE 
+                        WHEN s.file_url IS NOT NULL THEN SUBSTRING_INDEX(s.file_url, '.', -1)
+                        ELSE NULL
+                    END as file_type,
+                    CASE 
+                        WHEN s.file_url IS NOT NULL THEN SUBSTRING_INDEX(s.file_url, '/', -1)
+                        ELSE NULL
+                    END as file_name,
+                    CASE
+                        WHEN s.score IS NOT NULL THEN 'graded'
+                        WHEN s.submitted_at IS NOT NULL THEN 'submitted'
+                        ELSE 'not_submitted'
+                    END as status
+             FROM enhanced_submissions s
+             WHERE s.assignment_id = ? AND s.student_id = ?
+             ORDER BY s.submitted_at DESC
+             LIMIT 1`,
+            [assignmentId, studentId]
+        );
+        
+        const submission = submissions.length > 0 ? submissions[0] : null;
+
+        // Get student's grade for this assignment
+        const [grades] = await db.query(
+            `SELECT s.*, a.points_possible as max_points,
+                    CASE 
+                        WHEN s.score IS NULL THEN 'not_graded'
+                        ELSE 'graded'
+                    END as grade_status
+             FROM enhanced_submissions s
+             JOIN enhanced_assignments a ON s.assignment_id = a.assignment_id
+             WHERE s.assignment_id = ? AND s.student_id = ?`,
+            [assignmentId, studentId]
+        );
+        
+        const grade = grades.length > 0 ? {
+            points: grades[0].score,
+            max_points: grades[0].max_points,
+            feedback: grades[0].feedback,
+            graded_at: grades[0].graded_at,
+            status: grades[0].grade_status
+        } : null;
+
+        // Determine if student can resubmit
+        const canResubmit = submission && 
+            assignment.allow_late_submissions && 
+            (!grade || grade.points === null || 
+             (assignment.available_until && new Date(assignment.available_until) > new Date())) &&
+            (!assignment.max_submissions || 
+             (submission.submission_count < assignment.max_submissions));
+
+        // Check if assignment is currently available
+        const now = new Date();
+        const isAvailable = (!assignment.available_from || new Date(assignment.available_from) <= now) &&
+                           (!assignment.available_until || new Date(assignment.available_until) >= now) &&
+                           assignment.published === 1;
+
+        // Get allowed file types if this is a file upload assignment
+        let allowedFileTypes = [];
+        if (assignment.submission_type === 'file_upload' && assignment.allowed_file_types) {
+            allowedFileTypes = assignment.allowed_file_types.split(',').map(type => type.trim().toLowerCase());
+        }
+        
+        res.render('student/assignment-details', {
+            title: assignment.title,
+            user: req.session.user,
+            assignment,
+            course,
+            submission,
+            grade,
+            canResubmit,
+            isAvailable,
+            allowedFileTypes,
+            now: new Date()
+        });
+    } catch (error) {
+        console.error('Error getting assignment:', error);
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            sqlState: error.sqlState,
+            sqlMessage: error.sqlMessage
+        });
+        req.flash('error_msg', 'An error occurred while retrieving the assignment');
+        res.redirect('/student/courses');
+    }
+};
+
+// Submit assignment
+exports.submitAssignment = async (req, res) => {
+    try {
+        const assignmentId = req.params.id;
+        const studentId = req.session.user.user_id;
+        const { submissionText } = req.body;
+        const submissionFile = req.file;
+
+        // Get assignment details
+        const [assignments] = await db.query(
+            `SELECT a.*, m.module_id, m.title AS module_title, c.course_id, c.course_code, c.title AS course_title
+             FROM enhanced_assignments a
+             JOIN modules m ON a.module_id = m.module_id
+             JOIN courses c ON m.course_id = c.course_id
+             WHERE a.assignment_id = ?`,
+            [assignmentId]
+        );
+        
+        if (assignments.length === 0) {
+            console.error(`Assignment not found: ID ${assignmentId}`);
+            return res.status(404).send(`
+                <script>
+                    alert('Assignment not found');
+                    window.location.href = '/student/courses';
+                </script>
+            `);
+        }
+
+        const assignment = assignments[0];
+        const courseId = assignment.course_id;
+
+        // Check if student is enrolled in this course
+        const courses = await Student.getEnrolledCourses(studentId);
+        const isEnrolled = courses.some(course => course.course_id == courseId);
+        
+        if (!isEnrolled) {
+            console.error(`Access denied: Student ${studentId} not enrolled in course ${courseId}`);
+            return res.status(403).send(`
+                <script>
+                    alert('You do not have access to this assignment');
+                    window.location.href = '/student/courses';
+                </script>
+            `);
+        }
+
+        // Check if submission is within deadline
+        const now = new Date();
+        const dueDate = assignment.due_date ? new Date(assignment.due_date) : null;
+        const isLate = dueDate && now > dueDate;
+
+        if (isLate && !assignment.allow_late_submissions) {
+            console.error(`Late submission rejected: Assignment ${assignmentId}, Student ${studentId}`);
+            return res.status(400).send(`
+                <script>
+                    alert('Assignment submission deadline has passed');
+                    window.location.href = '/student/assignments/${assignmentId}';
+                </script>
+            `);
+        }
+
+        // Check if assignment is currently available
+        const isAvailable = (!assignment.available_from || new Date(assignment.available_from) <= now) &&
+                           (!assignment.available_until || new Date(assignment.available_until) >= now) &&
+                           assignment.published === 1;
+
+        if (!isAvailable) {
+            console.error(`Assignment not available: ID ${assignmentId}, Student ${studentId}`);
+            return res.status(400).send(`
+                <script>
+                    alert('This assignment is not currently available for submission');
+                    window.location.href = '/student/assignments/${assignmentId}';
+                </script>
+            `);
+        }
+
+        // Check if student has already submitted
+        const [existingSubmission] = await db.query(
+            'SELECT * FROM enhanced_submissions WHERE assignment_id = ? AND student_id = ?',
+            [assignmentId, studentId]
+        );
+
+        if (existingSubmission.length > 0) {
+            console.error(`Duplicate submission attempt: Assignment ${assignmentId}, Student ${studentId}`);
+            return res.status(400).send(`
+                <script>
+                    alert('You have already submitted this assignment');
+                    window.location.href = '/student/assignments/${assignmentId}';
+                </script>
+            `);
+        }
+
+        // Prepare submission data
+        const submissionData = {
+            assignment_id: assignmentId,
+            student_id: studentId,
+            content: submissionText || null,
+            file_url: submissionFile ? `/storage/assignments/${submissionFile.filename}` : null,
+            file_type: submissionFile ? submissionFile.mimetype.split('/')[1] : null,
+            file_name: submissionFile ? submissionFile.originalname : null,
+            submitted_at: now,
+            is_late: isLate
+        };
+
+        // Save submission
+        const [result] = await db.query(
+            `INSERT INTO enhanced_submissions
+            (assignment_id, student_id, content, file_url, file_type, file_name, submitted_at, is_late)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                submissionData.assignment_id,
+                submissionData.student_id,
+                submissionData.content,
+                submissionData.file_url,
+                submissionData.file_type,
+                submissionData.file_name,
+                submissionData.submitted_at,
+                submissionData.is_late
+            ]
+        );
+
+        console.log(`Submission successful: Assignment ${assignmentId}, Student ${studentId}`);
+
+        // Return JSON response with submission data
+        res.json({
+            success: true,
+            message: 'Assignment submitted successfully!',
+            submission: {
+                ...submissionData,
+                submission_id: result.insertId
+            }
+        });
+
+    } catch (error) {
+        console.error('Error submitting assignment:', error);
+        res.status(400).json({
+            success: false,
+            error: error.message || 'An error occurred while submitting the assignment'
+        });
+    }
+};
+
+// Request assignment resubmission
+exports.getResubmitAssignment = async (req, res) => {
+    try {
+        const assignmentId = req.params.id;
+        const studentId = req.session.user.user_id;
+        
+        // Check if assignment exists
+        const [assignments] = await db.query(
+            'SELECT * FROM enhanced_assignments WHERE assignment_id = ?',
+            [assignmentId]
+        );
+        
+        if (assignments.length === 0) {
+            req.flash('error_msg', 'Assignment not found');
+            return res.redirect(`/student/assignments/${assignmentId}`);
+        }
+        
+        // Check if student has already submitted
+        const [submissions] = await db.query(
+            'SELECT * FROM enhanced_submissions WHERE assignment_id = ? AND student_id = ?',
+            [assignmentId, studentId]
+        );
+        
+        if (submissions.length === 0) {
+            req.flash('error_msg', 'You have not submitted this assignment yet');
+            return res.redirect(`/student/assignments/${assignmentId}`);
+        }
+        
+        const assignment = assignments[0];
+        const submission = submissions[0];
+        
+        // Get course details
+        const [courseDetails] = await db.query(
+            `SELECT c.course_id, c.course_code, c.title
+             FROM courses c
+             JOIN modules m ON c.course_id = m.course_id
+             JOIN enhanced_assignments a ON m.module_id = a.module_id
+             WHERE a.assignment_id = ?`,
+            [assignmentId]
+        );
+        
+        if (courseDetails.length === 0) {
+            req.flash('error_msg', 'Course not found');
+            return res.redirect('/student/courses');
+        }
+        
+        res.render('student/resubmit-assignment', {
+            title: `Resubmit - ${assignment.title}`,
+            user: req.session.user,
+            assignment,
+            submission,
+            course: courseDetails[0]
+        });
+    } catch (error) {
+        console.error('Error getting resubmission page:', error);
+        req.flash('error_msg', 'An error occurred while loading the resubmission page');
+        res.redirect(`/student/assignments/${req.params.id}`);
     }
 };
 
@@ -392,4 +865,113 @@ exports.postGpaCalculator = async (req, res) => {
         req.flash('error_msg', 'An error occurred while calculating your GPA');
         res.redirect('/student/gpa-calculator');
     }
-}; 
+};
+
+// View module page
+exports.getModulePage = async (req, res) => {
+    try {
+        const { courseId, moduleId, pageId } = req.params;
+        const studentId = req.session.user.user_id;
+
+        // Check if student is enrolled in this course
+        const courses = await Student.getEnrolledCourses(studentId);
+        const isEnrolled = courses.some(course => course.course_id == courseId);
+
+        if (!isEnrolled) {
+            req.flash('error_msg', 'You are not enrolled in this course');
+            return res.redirect('/student/courses');
+        }
+
+        // Get course details
+        const course = await Course.findById(courseId);
+        if (!course) {
+            req.flash('error_msg', 'Course not found');
+            return res.redirect('/student/courses');
+        }
+
+        // Get module details
+        const [modules] = await db.query(
+            'SELECT * FROM modules WHERE module_id = ? AND course_id = ?',
+            [moduleId, courseId]
+        );
+
+        if (!modules || modules.length === 0) {
+            req.flash('error_msg', 'Module not found');
+            return res.redirect(`/student/courses/${courseId}`);
+        }
+
+        const module = modules[0];
+
+        // Get page content
+        const [page] = await db.query(
+            `SELECT p.*, m.title AS module_title 
+             FROM pages p
+             JOIN modules m ON p.module_id = m.module_id
+             WHERE p.page_id = ? AND p.module_id = ? AND m.course_id = ?`,
+            [pageId, moduleId, courseId]
+        );
+
+        if (!page || page.length === 0) {
+            req.flash('error_msg', 'Page not found');
+            return res.redirect(`/student/courses/${courseId}`);
+        }
+
+        // Get all pages in this module for navigation
+        const [modulePages] = await db.query(
+            `SELECT * FROM pages 
+             WHERE module_id = ? AND published = 1
+             ORDER BY created_at ASC`,
+            [moduleId]
+        );
+
+        // Get assignments for this module
+        let moduleAssignments = [];
+        try {
+            // Get assignments with submission status
+            const [assignments] = await db.query(
+                `SELECT a.*, 
+                        (SELECT COUNT(*) FROM enhanced_submissions 
+                         WHERE assignment_id = a.assignment_id AND student_id = ?) as is_submitted
+                 FROM enhanced_assignments a
+                 WHERE a.module_id = ?
+                 ORDER BY a.due_date ASC`,
+                [studentId, moduleId]
+            );
+            moduleAssignments = assignments;
+        } catch (error) {
+            console.error('Error getting module assignments:', error);
+            // If there's an error, just get assignments without submission status
+            const [assignments] = await db.query(
+                `SELECT a.*, 0 as is_submitted
+                 FROM enhanced_assignments a
+                 WHERE a.module_id = ?
+                 ORDER BY a.due_date ASC`,
+                [moduleId]
+            );
+            moduleAssignments = assignments;
+        }
+
+        // Find current page index and get next page
+        const currentPageIndex = modulePages.findIndex(p => p.page_id === parseInt(pageId));
+        const nextPage = currentPageIndex < modulePages.length - 1 ? modulePages[currentPageIndex + 1] : null;
+        const prevPage = currentPageIndex > 0 ? modulePages[currentPageIndex - 1] : null;
+
+        res.render('student/module-page', {
+            title: page[0].title,
+            user: req.session.user,
+            page: page[0],
+            course,
+            module,
+            modulePages,
+            moduleAssignments,
+            nextPage,
+            prevPage,
+            courseId,
+            moduleId
+        });
+    } catch (error) {
+        console.error('Error getting module page:', error);
+        req.flash('error_msg', 'An error occurred while loading the page');
+        res.redirect('/student/dashboard');
+    }
+};

@@ -9,14 +9,30 @@ router.use(isAuthenticated);
 // View all active courses (requires authentication now)
 router.get('/', async (req, res) => {
     try {
-        const courses = await Course.findAll({
+        const { search, semester_id } = req.query;
+        const filters = {
             is_active: true
-        });
+        };
+        
+        // Add semester filter if provided
+        if (semester_id) {
+            filters.semester_id = semester_id;
+        }
+        
+        // Get all semesters for the filter dropdown
+        const db = require('../db');
+        const [semesters] = await db.query('SELECT * FROM semesters ORDER BY start_date DESC');
+        
+        // Get courses with search and filters
+        const courses = await Course.search(search, filters);
         
         res.render('courses/index', {
             title: 'Available Courses',
             user: req.session.user,
-            courses
+            courses,
+            semesters,
+            search,
+            semester_id
         });
     } catch (error) {
         console.error('Error getting courses:', error);
