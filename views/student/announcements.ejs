@@ -52,57 +52,70 @@
     </div>
 
     <!-- Announcements List -->
-    <div class="row">
-        <% if (announcements && announcements.length > 0) { %>
-            <% announcements.forEach(announcement => { %>
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100 announcement-card <%= announcement.is_spam ? 'border-danger' : '' %>">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><%= announcement.title %></h5>
-                            <div>
-                                <% if (announcement.is_spam) { %>
-                                    <span class="badge bg-danger me-1" title="Spam confidence: <%= Math.round(announcement.spam_confidence * 100) %>%">
-                                        <i class="fas fa-exclamation-triangle"></i> Spam
-                                    </span>
-                                <% } %>
-                                <% if (announcement.target_type === 'all') { %>
-                                    <span class="badge bg-primary">All Users</span>
-                                <% } else if (announcement.target_type === 'student') { %>
-                                    <span class="badge bg-info">Students</span>
-                                <% } else if (announcement.target_type === 'course') { %>
-                                    <span class="badge bg-success">Course: <%= announcement.course_code || '' %></span>
-                                <% } %>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <% if (announcement.is_spam) { %>
-                                <div class="alert alert-warning mb-3">
-                                    <i class="fas fa-exclamation-triangle me-2"></i> 
-                                    This announcement has been identified as potential spam.
-                                </div>
-                            <% } %>
-                            <div class="announcement-content mb-3">
-                                <%= announcement.content %>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mt-auto">
-                                <small class="text-muted">
-                                    <i class="fas fa-user me-1"></i> <%= announcement.creator_name || 'Unknown' %>
-                                </small>
-                                <small class="text-muted">
-                                    <i class="fas fa-calendar-alt me-1"></i> <%= new Date(announcement.created_at).toLocaleDateString() %>
-                                </small>
-                            </div>
-                        </div>
-                    </div>
+    <div class="card">
+        <div class="card-body">
+            <% if (announcements && announcements.length > 0) { %>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Target</th>
+                                <th>Created By</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Spam</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% announcements.forEach(announcement => { %>
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold"><%= announcement.title %></div>
+                                        <div class="small text-muted text-truncate" style="max-width: 300px;">
+                                            <%= announcement.content.substring(0, 100) %><%= announcement.content.length > 100 ? '...' : '' %>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <% if (announcement.target_type === 'all') { %>
+                                            <span class="badge bg-primary">All Users</span>
+                                        <% } else if (announcement.target_type === 'student') { %>
+                                            <span class="badge bg-info">Students</span>
+                                        <% } else if (announcement.target_type === 'course') { %>
+                                            <span class="badge bg-success">Course: <%= announcement.course_code || '' %></span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <%= announcement.creator_name || 'Unknown' %>
+                                    </td>
+                                    <td>
+                                        <%= new Date(announcement.created_at).toLocaleDateString() %>
+                                    </td>
+                                    <td>
+                                        <% if (announcement.is_active) { %>
+                                            <span class="badge bg-success">Active</span>
+                                        <% } else { %>
+                                            <span class="badge bg-danger">Inactive</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (announcement.is_spam) { %>
+                                            <span class="badge bg-danger" title="Confidence: <%= Math.round(announcement.spam_confidence * 100) %>%">Spam</span>
+                                        <% } else { %>
+                                            <span class="badge bg-success">OK</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
                 </div>
-            <% }); %>
-        <% } else { %>
-            <div class="col-12">
+            <% } else { %>
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i> No announcements available at this time.
                 </div>
-            </div>
-        <% } %>
+            <% } %>
+        </div>
     </div>
 
     <!-- Pagination -->

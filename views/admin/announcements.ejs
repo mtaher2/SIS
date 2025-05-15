@@ -17,14 +17,6 @@
         </div>
     </div>
 
-
-    <!-- Spam filter controls -->
-    <div class="mb-4">
-        <div class="btn-group" role="group">
-            <a href="/admin/announcements" class="btn btn-outline-primary <%= !filters || !filters.is_spam ? 'active' : '' %>">All</a>
-            <a href="/admin/announcements?filter=regular" class="btn btn-outline-success <%= filters && filters.is_spam === false ? 'active' : '' %>">Regular</a>
-            <a href="/admin/announcements?filter=spam" class="btn btn-outline-danger <%= filters && filters.is_spam === true ? 'active' : '' %>">Spam</a>
-
     <!-- Search and Filter -->
     <div class="card mb-4">
         <div class="card-body">
@@ -56,7 +48,15 @@
                     <button type="submit" class="btn btn-primary w-100">Filter</button>
                 </div>
             </form>
-            
+        </div>
+    </div>
+
+    <!-- Spam Filter Controls -->
+    <div class="mb-4">
+        <div class="btn-group" role="group">
+            <a href="/admin/announcements" class="btn btn-outline-primary <%= !filters || !filters.is_spam ? 'active' : '' %>">All</a>
+            <a href="/admin/announcements?filter=regular" class="btn btn-outline-success <%= filters && filters.is_spam === false ? 'active' : '' %>">Inbox</a>
+            <a href="/admin/announcements?filter=spam" class="btn btn-outline-danger <%= filters && filters.is_spam === true ? 'active' : '' %>">Spam</a>
         </div>
     </div>
 
@@ -66,7 +66,7 @@
             <% if (announcements && announcements.length > 0) { %>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
-                        <thead class="table-light">
+                        <thead>
                             <tr>
                                 <th>Title</th>
                                 <th>Target</th>
@@ -88,13 +88,13 @@
                                     </td>
                                     <td>
                                         <% if (announcement.target_type === 'all') { %>
-                                            <span class="badge bg-primary">All Users</span>
+                                            <span class="badge rounded-pill" style="background-color: var(--primary-color);">All Users</span>
                                         <% } else if (announcement.target_type === 'student') { %>
-                                            <span class="badge bg-info">Students</span>
+                                            <span class="badge rounded-pill" style="background-color: var(--secondary-color);">Students</span>
                                         <% } else if (announcement.target_type === 'instructor') { %>
-                                            <span class="badge bg-warning text-dark">Instructors</span>
+                                            <span class="badge rounded-pill" style="background-color: #ff9800;">Instructors</span>
                                         <% } else if (announcement.target_type === 'course') { %>
-                                            <span class="badge bg-success">Course</span>
+                                            <span class="badge rounded-pill" style="background-color: var(--success-color);">Course</span>
                                             <div class="small text-muted"><%= announcement.course_code || 'Unknown Course' %></div>
                                         <% } %>
                                     </td>
@@ -119,11 +119,11 @@
                                         <% } %>
                                     </td>
                                     <td>
-                                        <div class="d-flex justify-content-end">
-                                            <a href="/admin/announcements/edit/<%= announcement.announcement_id %>" class="btn btn-sm btn-primary me-1" title="Edit">
+                                        <div class="btn-group">
+                                            <a href="/admin/announcements/edit/<%= announcement.announcement_id %>" class="btn btn-sm btn-primary">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <button type="button" class="btn btn-sm btn-danger" title="Delete"
+                                            <button type="button" class="btn btn-sm btn-danger" 
                                                     onclick="confirmDelete('/admin/announcements/delete/<%= announcement.announcement_id %>', '<%= announcement.title %>')">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -165,9 +165,9 @@
 </div>
 
 <script>
-    function confirmDelete(url, title) {
-        document.getElementById('deleteForm').action = url;
-        document.getElementById('announcementTitle').textContent = title;
-        new bootstrap.Modal(document.getElementById('deleteModal')).show();
-    }
+function confirmDelete(url, title) {
+    document.getElementById('deleteForm').action = url;
+    document.getElementById('announcementTitle').textContent = title;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
 </script> 

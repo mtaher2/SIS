@@ -527,20 +527,8 @@ exports.deleteCourse = async (req, res) => {
 // Announcement management - list all announcements
 exports.getAnnouncements = async (req, res) => {
     try {
-
-        const filter = req.query.filter;
-        const filters = {};
-        
-        // Apply spam filtering
-        if (filter === 'spam') {
-            filters.is_spam = true;
-        } else if (filter === 'regular') {
-            filters.is_spam = false;
-        }
-        
-
         // Get search and filter parameters from query
-        const { search, target_type, status } = req.query;
+        const { search, target_type, status, filter } = req.query;
         
         // Prepare filters object
         const filters = {};
@@ -548,22 +536,20 @@ exports.getAnnouncements = async (req, res) => {
         if (target_type) filters.target_type = target_type;
         if (status === 'active') filters.is_active = true;
         if (status === 'inactive') filters.is_active = false;
+        if (filter === 'spam') {
+            filters.is_spam = true;
+        } else if (filter === 'regular') {
+            filters.is_spam = false;
+        }
         
         // Fetch announcements with filters
-
         const announcements = await Announcement.findAll(filters);
         
         res.render('admin/announcements', {
             title: 'Announcement Management',
             user: req.session.user,
             announcements,
-
             filters
-
-            search,
-            target_type,
-            status
-
         });
     } catch (error) {
         console.error('Error getting announcements:', error);

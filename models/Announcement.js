@@ -136,18 +136,16 @@ class Announcement {
                 params.push(filters.is_active);
             }
             
-
-            // Add spam filter
             if (filters.is_spam !== undefined) {
                 conditions.push('a.is_spam = ?');
                 params.push(filters.is_spam);
+            }
 
             // Add search filter
             if (filters.search) {
                 conditions.push('(a.title LIKE ? OR a.content LIKE ? OR c.course_code LIKE ?)');
                 const searchTerm = `%${filters.search}%`;
                 params.push(searchTerm, searchTerm, searchTerm);
-
             }
             
             if (conditions.length > 0) {

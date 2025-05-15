@@ -17,7 +17,39 @@
         </div>
     </div>
 
-    <!-- Spam filter controls -->
+    <!-- Search and Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form action="/instructor/announcements" method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label for="search" class="form-label">Search</label>
+                    <input type="text" class="form-control" id="search" name="search" 
+                           placeholder="Title or content" value="<%= locals.search || '' %>">
+                </div>
+                <div class="col-md-3">
+                    <label for="target_type" class="form-label">Target</label>
+                    <select class="form-select" id="target_type" name="target_type">
+                        <option value="">All Targets</option>
+                        <option value="instructor" <%= locals.target_type === 'instructor' ? 'selected' : '' %>>Instructors</option>
+                        <option value="course" <%= locals.target_type === 'course' ? 'selected' : '' %>>Courses</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">All Statuses</option>
+                        <option value="active" <%= locals.status === 'active' ? 'selected' : '' %>>Active</option>
+                        <option value="inactive" <%= locals.status === 'inactive' ? 'selected' : '' %>>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Spam Filter Controls -->
     <div class="mb-4">
         <div class="btn-group" role="group">
             <a href="/instructor/announcements" class="btn btn-outline-primary <%= !filters || !filters.is_spam ? 'active' : '' %>">All</a>
@@ -32,7 +64,7 @@
             <% if (announcements && announcements.length > 0) { %>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
-                        <thead class="table-light">
+                        <thead>
                             <tr>
                                 <th>Title</th>
                                 <th>Target</th>
@@ -79,11 +111,11 @@
                                         <% } %>
                                     </td>
                                     <td>
-                                        <div class="d-flex justify-content-end">
-                                            <a href="/instructor/announcements/edit/<%= announcement.announcement_id %>" class="btn btn-sm btn-primary me-1" title="Edit">
+                                        <div class="btn-group">
+                                            <a href="/instructor/announcements/edit/<%= announcement.announcement_id %>" class="btn btn-sm btn-primary">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <button type="button" class="btn btn-sm btn-danger" title="Delete"
+                                            <button type="button" class="btn btn-sm btn-danger" 
                                                     onclick="confirmDelete('/instructor/announcements/delete/<%= announcement.announcement_id %>', '<%= announcement.title %>')">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -125,9 +157,9 @@
 </div>
 
 <script>
-    function confirmDelete(url, title) {
-        document.getElementById('deleteForm').action = url;
-        document.getElementById('announcementTitle').textContent = title;
-        new bootstrap.Modal(document.getElementById('deleteModal')).show();
-    }
+function confirmDelete(url, title) {
+    document.getElementById('deleteForm').action = url;
+    document.getElementById('announcementTitle').textContent = title;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
 </script> 
