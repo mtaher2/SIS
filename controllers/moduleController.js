@@ -5,6 +5,7 @@ const Quiz = require('../models/Quiz');
 const EnhancedAssignment = require('../models/EnhancedAssignment');
 const Course = require('../models/Course');
 const { upload, deleteFile } = require('../utils/upload');
+const db = require('../db');
 
 // Helper function to check if instructor is authorized for a module
 const checkModuleAuthorization = async (moduleId, instructorId) => {
@@ -1594,7 +1595,7 @@ exports.toggleAssignmentPublish = async (req, res) => {
 };
 
 // Get submissions for an assignment
-exports.getAssignmentSubmissions = async (req, res) => {
+exports.getSubmissions = async (req, res) => {
     try {
         const moduleId = req.params.moduleId;
         const assignmentId = req.params.assignmentId;
@@ -1607,7 +1608,7 @@ exports.getAssignmentSubmissions = async (req, res) => {
             return res.redirect('/instructor/courses');
         }
         
-        // Get assignment
+        // Get assignment with course info
         const assignment = await EnhancedAssignment.getWithCourseInfo(assignmentId);
         
         if (!assignment || assignment.module_id != moduleId) {
@@ -1615,8 +1616,21 @@ exports.getAssignmentSubmissions = async (req, res) => {
             return res.redirect(`/instructor/modules/${moduleId}/assignments`);
         }
         
-        // Get submissions
-        const submissions = await EnhancedAssignment.getSubmissions(assignmentId);
+        // Get submissions with student info
+        const [submissions] = await db.query(
+            `SELECT es.*, u.first_name, u.last_name, u.email,
+                    CASE WHEN es.score IS NOT NULL THEN TRUE ELSE FALSE END as graded,
+                    CASE WHEN es.is_late = 1 THEN TRUE ELSE FALSE END as is_late,
+                    (SELECT COUNT(*) FROM enhanced_submissions es2 
+                     WHERE es2.assignment_id = es.assignment_id 
+                     AND es2.student_id = es.student_id 
+                     AND es2.submitted_at < es.submitted_at) as submission_count
+             FROM enhanced_submissions es
+             JOIN users u ON es.student_id = u.user_id
+             WHERE es.assignment_id = ?
+             ORDER BY es.submitted_at DESC`,
+            [assignmentId]
+        );
         
         res.render('instructor/assignments/submissions', {
             title: `Submissions - ${assignment.title}`,
@@ -1648,27 +1662,61 @@ exports.getSubmission = async (req, res) => {
             return res.redirect('/instructor/courses');
         }
         
-        // Get assignment
-        const assignment = await EnhancedAssignment.getWithCourseInfo(assignmentId);
+        // Get assignment details
+        const [assignmentRows] = await db.query(
+            `SELECT ea.*, m.title as module_name, c.title as course_name, c.course_id
+             FROM enhanced_assignments ea
+             JOIN modules m ON ea.module_id = m.module_id
+             JOIN courses c ON m.course_id = c.course_id
+             WHERE ea.assignment_id = ?`,
+            [assignmentId]
+        );
         
-        if (!assignment || assignment.module_id != moduleId) {
+        if (assignmentRows.length === 0) {
             req.flash('error_msg', 'Assignment not found');
-            return res.redirect(`/instructor/modules/${moduleId}/assignments`);
+            return res.redirect(`/instructor/modules/${moduleId}`);
         }
         
-        // Get submission
-        const submission = await EnhancedAssignment.getSubmission(submissionId);
+        const assignment = assignmentRows[0];
         
-        if (!submission || submission.assignment_id != assignmentId) {
+        // Get submission with student info and grading details
+        const [submissionRows] = await db.query(
+            `SELECT es.*, u.first_name, u.last_name, u.email, u.username,
+                    IFNULL(es.file_url, '') as file_url,
+                    IFNULL(es.file_name, '') as file_name,
+                    IFNULL(es.file_type, '') as file_type,
+                    IFNULL(es.feedback, '') as feedback,
+                    IFNULL(es.score, '') as score,
+                    CASE WHEN es.score IS NOT NULL THEN TRUE ELSE FALSE END as graded,
+                    CASE WHEN es.is_late = 1 THEN TRUE ELSE FALSE END as is_late,
+                    (SELECT CONCAT(u2.first_name, ' ', u2.last_name) 
+                     FROM users u2 
+                     WHERE u2.user_id = es.graded_by) as graded_by_name
+             FROM enhanced_submissions es
+             JOIN users u ON es.student_id = u.user_id
+             WHERE es.submission_id = ?`,
+            [submissionId]
+        );
+        
+        if (submissionRows.length === 0) {
             req.flash('error_msg', 'Submission not found');
             return res.redirect(`/instructor/modules/${moduleId}/assignments/${assignmentId}/submissions`);
         }
         
+        const submission = submissionRows[0];
+        
+        // Render the submission view
         res.render('instructor/assignments/submission', {
             title: `Submission - ${submission.first_name} ${submission.last_name}`,
             user: req.session.user,
-            course: auth.course,
-            module: auth.module,
+            course: {
+                course_id: assignment.course_id,
+                course_name: assignment.course_name
+            },
+            module: {
+                module_id: moduleId,
+                module_name: assignment.module_name
+            },
             assignment,
             submission
         });
@@ -1686,6 +1734,7 @@ exports.gradeSubmission = async (req, res) => {
         const assignmentId = req.params.assignmentId;
         const submissionId = req.params.submissionId;
         const instructorId = req.session.user.user_id;
+        const { score, feedback } = req.body;
         
         // Check authorization
         const auth = await checkModuleAuthorization(moduleId, instructorId);
@@ -1694,28 +1743,39 @@ exports.gradeSubmission = async (req, res) => {
             return res.redirect('/instructor/courses');
         }
         
-        // Get assignment
-        const assignment = await EnhancedAssignment.getWithCourseInfo(assignmentId);
+        // Validate score
+        const [assignmentRows] = await db.query(
+            'SELECT points_possible FROM enhanced_assignments WHERE assignment_id = ?',
+            [assignmentId]
+        );
         
-        if (!assignment || assignment.module_id != moduleId) {
+        if (assignmentRows.length === 0) {
             req.flash('error_msg', 'Assignment not found');
-            return res.redirect(`/instructor/modules/${moduleId}/assignments`);
+            return res.redirect(`/instructor/modules/${moduleId}`);
         }
         
-        // Grade submission
-        const gradeData = {
-            score: parseFloat(req.body.score),
-            feedback: req.body.feedback,
-            graded_by: instructorId
-        };
+        const assignment = assignmentRows[0];
+        const maxScore = parseFloat(assignment.points_possible);
+        const parsedScore = parseFloat(score);
         
-        await EnhancedAssignment.gradeSubmission(submissionId, gradeData);
+        if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > maxScore) {
+            req.flash('error_msg', `Score must be between 0 and ${maxScore}`);
+            return res.redirect(`/instructor/modules/${moduleId}/assignments/${assignmentId}/submissions/${submissionId}`);
+        }
+        
+        // Update the submission with grade
+        await db.query(
+            `UPDATE enhanced_submissions 
+             SET score = ?, feedback = ?, graded_by = ?, graded_at = NOW(), graded = 1
+             WHERE submission_id = ?`,
+            [parsedScore, feedback, instructorId, submissionId]
+        );
         
         req.flash('success_msg', 'Submission graded successfully');
-        res.redirect(`/instructor/modules/${moduleId}/assignments/${assignmentId}/submissions`);
+        res.redirect(`/instructor/modules/${moduleId}/assignments/${assignmentId}/submissions/${submissionId}`);
     } catch (error) {
         console.error('Error grading submission:', error);
         req.flash('error_msg', 'An error occurred while grading the submission');
-        res.redirect(`/instructor/modules/${req.params.moduleId}/assignments/${req.params.assignmentId}/submissions/${req.params.submissionId}`);
+        res.redirect(`/instructor/modules/${moduleId}/assignments/${assignmentId}/submissions/${submissionId}`);
     }
 }; 

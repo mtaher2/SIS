@@ -36,17 +36,27 @@ app.use((req, res, next) => {
     // Override the default render method
     const originalRender = res.render;
     res.render = function(view, options, callback) {
+        // Ensure options contains user info even if undefined
+        if (!options) {
+            options = {};
+        }
+        
+        // Make sure user is defined even if it's null
+        if (typeof options.user === 'undefined') {
+            options.user = req.session && req.session.user ? req.session.user : null;
+        }
+        
         if (options && !options.layout && view !== 'layouts/main') {
             // If no layout specified and not rendering the layout itself
             // First, render the view content
             originalRender.call(this, view, options, (err, content) => {
                 if (err) return callback ? callback(err) : next(err);
                 
+                // Ensure we always have valid options with user info for layout
+                const layoutOptions = { ...options, body: content };
+                
                 // Then, render with the layout
-                originalRender.call(this, 'layouts/main', {
-                    ...options,
-                    body: content
-                }, callback);
+                originalRender.call(this, 'layouts/main', layoutOptions, callback);
             });
         } else {
             // Regular rendering (for layout or when layout is explicitly specified)

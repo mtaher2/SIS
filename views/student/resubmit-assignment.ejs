@@ -1,0 +1,179 @@
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">Resubmit Assignment</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/student/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/student/courses">My Courses</a></li>
+                    <li class="breadcrumb-item"><a href="/student/courses/<%= course.course_id %>"><%= course.title %></a></li>
+                    <li class="breadcrumb-item"><a href="/student/assignments/<%= assignment.assignment_id %>"><%= assignment.title %></a></li>
+                    <li class="breadcrumb-item active">Resubmit</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Resubmit Assignment</h5>
+                    <span class="badge bg-warning">Resubmission</span>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>
+                        You are resubmitting your work for <strong><%= assignment.title %></strong>. Your previous submission will be replaced with this new one.
+                        <% if (assignment.resubmission_deadline) { %>
+                            <div class="mt-2">
+                                <strong>Resubmission deadline:</strong> 
+                                <%= new Date(assignment.resubmission_deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                            </div>
+                        <% } %>
+                    </div>
+                    
+                    <h6 class="fw-bold mb-2">Your Previous Submission</h6>
+                    <div class="previous-submission mb-4">
+                        <% if (submission.file_url) { %>
+                            <div class="mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <a href="<%= submission.file_url %>" class="d-flex align-items-center text-decoration-none" target="_blank">
+                                        <% if (submission.file_type === 'pdf') { %>
+                                            <i class="fas fa-file-pdf text-danger fa-2x me-3"></i>
+                                        <% } else if (submission.file_type === 'doc' || submission.file_type === 'docx') { %>
+                                            <i class="fas fa-file-word text-primary fa-2x me-3"></i>
+                                        <% } else if (submission.file_type === 'ppt' || submission.file_type === 'pptx') { %>
+                                            <i class="fas fa-file-powerpoint text-warning fa-2x me-3"></i>
+                                        <% } else { %>
+                                            <i class="fas fa-file text-secondary fa-2x me-3"></i>
+                                        <% } %>
+                                        <div>
+                                            <div class="fw-bold"><%= submission.file_name %></div>
+                                            <small class="text-muted">Click to view your previous submission</small>
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                        <% } %>
+                        
+                        <% if (submission.content) { %>
+                            <div class="mb-3">
+                                <div class="p-3 bg-light rounded content-preview">
+                                    <%= submission.content %>
+                                </div>
+                            </div>
+                        <% } %>
+                        
+                        <div class="text-muted mb-3">
+                            <small>
+                                <i class="fas fa-clock me-1"></i>
+                                Originally submitted on <%= new Date(submission.submitted_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <h6 class="fw-bold mb-3">Submit New Work</h6>
+                    <form action="/student/assignments/<%= assignment.assignment_id %>/submit" method="POST" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <% if (assignment.submission_type === 'file' || assignment.submission_type === 'both') { %>
+                                <div class="mb-3">
+                                    <label for="submissionFile" class="form-label">Upload File</label>
+                                    <input type="file" class="form-control" id="submissionFile" name="submissionFile" <%= assignment.submission_type === 'file' ? 'required' : '' %>>
+                                    <div class="form-text">
+                                        Allowed file types: PDF, DOC, DOCX, PPT, PPTX, ZIP, RAR (Max size: 10MB)
+                                    </div>
+                                </div>
+                            <% } %>
+                            
+                            <% if (assignment.submission_type === 'text' || assignment.submission_type === 'both') { %>
+                                <div class="mb-3">
+                                    <label for="submissionText" class="form-label">Text Submission</label>
+                                    <textarea class="form-control" id="submissionText" name="submissionText" rows="6" <%= assignment.submission_type === 'text' ? 'required' : '' %>><%= submission.content || '' %></textarea>
+                                    <div class="form-text">
+                                        Your previous text submission has been pre-filled. You can edit it or completely replace it.
+                                    </div>
+                                </div>
+                            <% } %>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="submissionConfirm" required>
+                            <label class="form-check-label" for="submissionConfirm">
+                                I confirm that this work is my own and complies with the university's academic integrity policy
+                            </label>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-1"></i> Submit New Version
+                            </button>
+                            <a href="/student/assignments/<%= assignment.assignment_id %>" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Assignment Information</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="fw-bold"><%= assignment.title %></h6>
+                    <p class="mb-3 text-muted">
+                        <i class="fas fa-book me-1"></i>
+                        <%= course.course_code %> - <%= course.title %>
+                    </p>
+                    
+                    <hr>
+                    
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted">Original Due Date:</span>
+                            <span class="fw-medium">
+                                <%= new Date(assignment.due_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %>
+                            </span>
+                        </li>
+                        <% if (assignment.resubmission_deadline) { %>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Resubmission Deadline:</span>
+                                <span class="fw-medium">
+                                    <%= new Date(assignment.resubmission_deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %>
+                                </span>
+                            </li>
+                        <% } %>
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted">Max Points:</span>
+                            <span class="fw-medium"><%= assignment.max_points %></span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted">Weight:</span>
+                            <span class="fw-medium"><%= assignment.weight_percentage %>% of final grade</span>
+                        </li>
+                    </ul>
+                    
+                    <% if (assignment.resubmission_notes) { %>
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <div class="fw-bold mb-1">Resubmission Notes:</div>
+                            <%= assignment.resubmission_notes %>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .content-preview {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+</style> 

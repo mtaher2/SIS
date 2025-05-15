@@ -18,6 +18,8 @@ const storage = multer.diskStorage({
         
         if (file.fieldname === 'profile_image') {
             uploadDir = path.join(__dirname, '../public/storage/profile_images');
+        } else if (file.fieldname === 'submissionFile') {
+            uploadDir = path.join(__dirname, '../public/storage/assignments');
         } else {
             uploadDir = path.join(__dirname, '../public/storage');
         }

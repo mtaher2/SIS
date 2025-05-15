@@ -1,34 +1,42 @@
 const express = require('express');
 const router = express.Router();
-const { check } = require('express-validator');
 const studentController = require('../controllers/studentController');
 const { isAuthenticated, isStudent } = require('../utils/auth');
+const { upload } = require('../utils/upload');
 
-// Apply middleware to all student routes
+// Apply student role middleware to all routes
 router.use(isAuthenticated, isStudent);
 
-// Dashboard
+// Dashboard route
 router.get('/dashboard', studentController.getDashboard);
 
-// Profile management
+// Profile routes
 router.get('/profile', studentController.getProfile);
 router.get('/update-profile', studentController.getUpdateProfile);
 router.post('/update-profile', studentController.postUpdateProfile);
 
-// Course management
+// Course routes
 router.get('/courses', studentController.getCourses);
 router.get('/courses/:id', studentController.getCourse);
 
-// Grades
+// Module and page routes
+router.get('/courses/:courseId/modules/:moduleId/pages/:pageId', studentController.getModulePage);
+
+// Assignment routes
+router.get('/assignments/:id', studentController.getAssignment);
+router.post('/assignments/:id/submit', upload.single('submissionFile'), studentController.submitAssignment);
+router.get('/assignments/:id/resubmit', studentController.getResubmitAssignment);
+
+// Grades route
 router.get('/grades', studentController.getGrades);
 
-// Attendance
+// Attendance route
 router.get('/attendance', studentController.getAttendance);
 
-// Announcements
+// Announcements route
 router.get('/announcements', studentController.getAnnouncements);
 
-// GPA Calculator
+// GPA Calculator routes
 router.get('/gpa-calculator', studentController.getGpaCalculator);
 router.post('/gpa-calculator', studentController.postGpaCalculator);
 

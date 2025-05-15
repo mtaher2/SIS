@@ -1,0 +1,451 @@
+<div class="container mt-4">
+    <% if (typeof error !== 'undefined' && error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <% } %>
+    
+    <% if (!assignment) { %>
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Assignment not found or you don't have access to it.
+        </div>
+    <% } else { %>
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <h1 class="mb-2"><%= assignment.title %></h1>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Home</a></li>
+                        <li class="breadcrumb-item"><a href="/student/dashboard">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="/student/courses">My Courses</a></li>
+                        <li class="breadcrumb-item"><a href="/student/courses/<%= course.course_id %>"><%= course.title %></a></li>
+                        <li class="breadcrumb-item active">Assignment</li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <% if (grade) { %>
+                    <div class="grade-badge">
+                        <span class="grade-label">Your Grade</span>
+                        <% if (grade.status === 'graded' && grade.points !== null) { %>
+                            <span class="grade-value bg-<%= (grade.points/grade.max_points*100) >= 90 ? 'success' : (grade.points/grade.max_points*100) >= 80 ? 'primary' : (grade.points/grade.max_points*100) >= 70 ? 'info' : (grade.points/grade.max_points*100) >= 60 ? 'warning' : 'danger' %>">
+                                <%= grade.points %>/<%= grade.max_points %>
+                            </span>
+                        <% } else { %>
+                            <span class="grade-value bg-secondary">
+                                Not Graded
+                            </span>
+                        <% } %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Assignment Details -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Assignment Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold">
+                                    <i class="fas fa-book me-2"></i> <%= course.course_code %> - <%= course.title %>
+                                </h6>
+                                <span class="badge bg-info rounded-pill">
+                                    <i class="fas fa-trophy me-1"></i> <%= assignment.max_points %> Points
+                                </span>
+                            </div>
+                            
+                            <div class="d-flex flex-wrap gap-3 mb-3">
+                                <div>
+                                    <span class="text-muted">Posted:</span>
+                                    <span class="ms-1 fw-medium">
+                                        <%= new Date(assignment.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %>
+                                    </span>
+                                </div>
+                                
+                                <div>
+                                    <span class="text-muted">Due:</span>
+                                    <span class="ms-1 fw-medium">
+                                        <%= new Date(assignment.due_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                                    </span>
+                                </div>
+                                
+                                <div>
+                                    <span class="text-muted">Weight:</span>
+                                    <span class="ms-1 fw-medium"><%= assignment.weight_percentage %>% of final grade</span>
+                                </div>
+                            </div>
+                            
+                            <% 
+                                const now = new Date();
+                                const dueDate = new Date(assignment.due_date);
+                                const isOverdue = dueDate < now && !submission;
+                                const timeRemaining = dueDate - now;
+                                
+                                let statusClass = 'bg-warning';
+                                let statusText = 'Pending';
+                                
+                                if (submission) {
+                                    statusClass = 'bg-success';
+                                    statusText = 'Submitted';
+                                } else if (isOverdue) {
+                                    statusClass = 'bg-danger';
+                                    statusText = 'Overdue';
+                                } else if (timeRemaining < 86400000) { // less than 24 hours
+                                    statusClass = 'bg-warning';
+                                    statusText = 'Due Soon';
+                                }
+                            %>
+                            
+                            <div class="d-flex align-items-center mb-4">
+                                <span class="badge rounded-pill <%= statusClass %> me-2"><%= statusText %></span>
+                                
+                                <% if (!submission && !isOverdue) { %>
+                                    <span class="text-muted">
+                                        <% if (timeRemaining < 86400000) { %>
+                                            <i class="fas fa-clock text-warning me-1"></i>
+                                            <% const hours = Math.floor(timeRemaining / 3600000); %>
+                                            <% const minutes = Math.floor((timeRemaining % 3600000) / 60000); %>
+                                            <%= hours %> hours, <%= minutes %> minutes remaining
+                                        <% } else { %>
+                                            <i class="fas fa-calendar-alt me-1"></i>
+                                            <%= Math.ceil(timeRemaining / 86400000) %> days remaining
+                                        <% } %>
+                                    </span>
+                                <% } else if (submission) { %>
+                                    <span class="text-success">
+                                        <i class="fas fa-check-circle me-1"></i>
+                                        Submitted on <%= new Date(submission.submitted_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                                    </span>
+                                <% } %>
+                            </div>
+                            
+                            <div class="assignment-description mb-4">
+                                <h6 class="fw-bold mb-2">Description</h6>
+                                <div class="p-3 bg-light rounded">
+                                    <%- assignment.instructions || 'No description provided.' %>
+                                </div>
+                            </div>
+                            
+                            <% if (assignment.submission_type === 'file_upload') { %>
+                                <div class="submission-requirements mb-4">
+                                    <h6 class="fw-bold mb-2">Submission Requirements</h6>
+                                    <div class="p-3 bg-light rounded">
+                                        <p class="mb-2">Please upload a file for this assignment.</p>
+                                        <% if (assignment.allowed_file_types) { %>
+                                            <p class="mb-0">Allowed file types: <%= assignment.allowed_file_types %></p>
+                                        <% } else { %>
+                                            <p class="mb-0">Maximum file size: 10MB. Supported formats: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT, JPG, PNG, GIF, ZIP, RAR</p>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            <% } else if (assignment.submission_type === 'online_text') { %>
+                                <div class="submission-requirements mb-4">
+                                    <h6 class="fw-bold mb-2">Submission Requirements</h6>
+                                    <div class="p-3 bg-light rounded">
+                                        <p class="mb-0">Please provide your submission in the text box below.</p>
+                                    </div>
+                                </div>
+                            <% } else if (assignment.submission_type === 'external_url') { %>
+                                <div class="submission-requirements mb-4">
+                                    <h6 class="fw-bold mb-2">Submission Requirements</h6>
+                                    <div class="p-3 bg-light rounded">
+                                        <p class="mb-0">Please provide an external URL for your submission.</p>
+                                    </div>
+                                </div>
+                            <% } %>
+                            
+                            <% if (assignment.file_url) { %>
+                                <div class="assignment-file mb-4">
+                                    <h6 class="fw-bold mb-2">Assignment Files</h6>
+                                    <div class="p-3 bg-light rounded">
+                                        <a href="<%= assignment.file_url %>" class="d-flex align-items-center text-decoration-none" target="_blank">
+                                            <% if (assignment.file_type === 'pdf') { %>
+                                                <i class="fas fa-file-pdf text-danger fa-2x me-3"></i>
+                                            <% } else if (assignment.file_type === 'doc' || assignment.file_type === 'docx') { %>
+                                                <i class="fas fa-file-word text-primary fa-2x me-3"></i>
+                                            <% } else if (assignment.file_type === 'ppt' || assignment.file_type === 'pptx') { %>
+                                                <i class="fas fa-file-powerpoint text-warning fa-2x me-3"></i>
+                                            <% } else if (assignment.file_type === 'zip' || assignment.file_type === 'rar') { %>
+                                                <i class="fas fa-file-archive text-secondary fa-2x me-3"></i>
+                                            <% } else { %>
+                                                <i class="fas fa-file text-secondary fa-2x me-3"></i>
+                                            <% } %>
+                                            <div>
+                                                <div class="fw-bold">Download Assignment</div>
+                                                <small class="text-muted">Click to download the assignment file</small>
+                                            </div>
+                                        </a>
+                                    </div>
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Submission Section -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Your Submission</h5>
+                    </div>
+                    <div class="card-body">
+                        <% if (submission) { %>
+                            <!-- Existing Submission -->
+                            <div class="submission-details">
+                                <div class="alert alert-success mb-4">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    You have submitted this assignment on <%= new Date(submission.submitted_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                                </div>
+                                
+                                <% if (submission.file_url) { %>
+                                    <div class="mb-3">
+                                        <h6 class="fw-bold mb-2">Submitted File</h6>
+                                        <div class="submission-preview p-3 bg-light rounded">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <a href="<%= submission.file_url %>" class="d-flex align-items-center text-decoration-none" target="_blank">
+                                                    <% if (submission.file_type === 'pdf') { %>
+                                                        <i class="fas fa-file-pdf text-danger fa-2x me-3"></i>
+                                                    <% } else if (submission.file_type === 'doc' || submission.file_type === 'docx') { %>
+                                                        <i class="fas fa-file-word text-primary fa-2x me-3"></i>
+                                                    <% } else if (submission.file_type === 'ppt' || submission.file_type === 'pptx') { %>
+                                                        <i class="fas fa-file-powerpoint text-warning fa-2x me-3"></i>
+                                                    <% } else { %>
+                                                        <i class="fas fa-file text-secondary fa-2x me-3"></i>
+                                                    <% } %>
+                                                    <div>
+                                                        <div class="fw-bold"><%= submission.file_name %></div>
+                                                        <small class="text-muted">Click to view your submission</small>
+                                                    </div>
+                                                </a>
+                                            </div>
+                                            <div class="submission-meta">
+                                                <div class="d-flex flex-wrap gap-3 text-muted small">
+                                                    <div>
+                                                        <i class="fas fa-clock me-1"></i>
+                                                        Submitted: <%= new Date(submission.submitted_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                                                    </div>
+                                                    <div>
+                                                        <i class="fas fa-file-alt me-1"></i>
+                                                        File type: <%= submission.file_type.toUpperCase() %>
+                                                    </div>
+                                                    <div>
+                                                        <i class="fas fa-download me-1"></i>
+                                                        <a href="<%= submission.file_url %>" class="text-decoration-none" download>Download</a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <% } %>
+                                
+                                <% if (submission.content) { %>
+                                    <div class="mb-3">
+                                        <h6 class="fw-bold mb-2">Submitted Text</h6>
+                                        <div class="submission-preview p-3 bg-light rounded">
+                                            <div class="submission-content mb-3">
+                                                <%= submission.content %>
+                                            </div>
+                                            <div class="submission-meta">
+                                                <div class="d-flex flex-wrap gap-3 text-muted small">
+                                                    <div>
+                                                        <i class="fas fa-clock me-1"></i>
+                                                        Submitted: <%= new Date(submission.submitted_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                                                    </div>
+                                                    <div>
+                                                        <i class="fas fa-edit me-1"></i>
+                                                        Last edited: <%= new Date(submission.updated_at || submission.submitted_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <% } %>
+                                
+                                <% if (canResubmit) { %>
+                                    <div class="mt-4">
+                                        <a href="/student/assignments/<%= assignment.assignment_id %>/resubmit" class="btn btn-warning">
+                                            <i class="fas fa-sync-alt me-1"></i> Resubmit Assignment
+                                        </a>
+                                    </div>
+                                <% } %>
+                            </div>
+                        <% } else if (!isOverdue && isAvailable) { %>
+                            <!-- New Submission Form -->
+                            <form id="submissionForm" action="/student/assignments/<%= assignment.assignment_id %>/submit" method="POST" enctype="multipart/form-data">
+                                <div class="mb-3">
+                                    <label for="submissionFile" class="form-label fw-bold">Upload File</label>
+                                    <input type="file" class="form-control" id="submissionFile" name="submissionFile" required>
+                                    <div class="form-text">Maximum file size: 10MB. Supported formats: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT, JPG, PNG, GIF, ZIP, RAR</div>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="submissionConfirm" required>
+                                    <label class="form-check-label" for="submissionConfirm">
+                                        I confirm that this work is my own and complies with the university's academic integrity policy
+                                    </label>
+                                </div>
+                                <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                                <div id="success-message" class="alert alert-success" style="display: none;"></div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-paper-plane me-1"></i> Submit Assignment
+                                </button>
+                            </form>
+                        <% } else if (!isAvailable) { %>
+                            <!-- Not Available Warning -->
+                            <div class="alert alert-warning">
+                                <i class="fas fa-clock me-2"></i>
+                                <strong>This assignment is not available yet.</strong>
+                                <% if (assignment.available_from) { %>
+                                    It will be available from <%= new Date(assignment.available_from).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>.
+                                <% } %>
+                            </div>
+                        <% } else { %>
+                            <!-- Overdue Warning -->
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>This assignment is past due.</strong> The deadline was <%= new Date(assignment.due_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>.
+                                <% if (assignment.allow_late_submissions) { %>
+                                    Late submissions are allowed with a <%= assignment.late_submission_deduction %>% deduction.
+                                <% } else { %>
+                                    Please contact your instructor if you need to make a late submission.
+                                <% } %>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+                
+                <!-- Feedback Section (if graded) -->
+                <% if (grade && grade.status === 'graded' && grade.feedback) { %>
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Instructor Feedback</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="p-3 bg-light rounded">
+                                <%= grade.feedback %>
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+            </div>
+            
+            <div class="col-lg-4">
+                <!-- Assignment Info Card -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Assignment Info</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Type:</span>
+                                <span class="fw-medium">
+                                    <%= assignment.assignment_type || 'Regular Assignment' %>
+                                </span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Max Points:</span>
+                                <span class="fw-medium"><%= assignment.max_points %></span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Weight:</span>
+                                <span class="fw-medium"><%= assignment.weight_percentage %>% of final grade</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Allows Resubmission:</span>
+                                <span class="fw-medium"><%= assignment.allows_resubmission ? 'Yes' : 'No' %></span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Status:</span>
+                                <span class="badge <%= statusClass %>"><%= statusText %></span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Rubric Card (if available) -->
+                <% if (assignment.has_rubric) { %>
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Grading Rubric</h5>
+                        </div>
+                        <div class="card-body">
+                            <% if (rubric && rubric.length > 0) { %>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Criteria</th>
+                                                <th>Points</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <% rubric.forEach(item => { %>
+                                                <tr>
+                                                    <td><%= item.criteria %></td>
+                                                    <td><%= item.max_points %></td>
+                                                </tr>
+                                            <% }); %>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <% } else { %>
+                                <p class="mb-0">
+                                    This assignment uses a rubric for grading. You can view the detailed rubric after submission.
+                                </p>
+                            <% } %>
+                        </div>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    <% } %>
+</div>
+
+<style>
+    .grade-badge {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .grade-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-bottom: 0.2rem;
+    }
+    
+    .grade-value {
+        padding: 0.5rem 1rem;
+        border-radius: 2rem;
+        font-weight: bold;
+        color: white;
+        font-size: 1.1rem;
+    }
+
+    .submission-preview {
+        border: 1px solid #dee2e6;
+        transition: all 0.2s ease;
+    }
+
+    .submission-preview:hover {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+
+    .submission-meta {
+        border-top: 1px solid #dee2e6;
+        padding-top: 0.75rem;
+        margin-top: 0.75rem;
+    }
+
+    .submission-content {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+</style> 

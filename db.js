@@ -15,10 +15,8 @@ const pool = mysql.createPool({
     connectionLimit: 20,
     queueLimit: 0,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 30000,  // 30 seconds
-    connectTimeout: 60000, // 60 seconds
-    acquireTimeout: 60000, // 60 seconds
-    timeout: 60000 // 60 seconds general timeout
+    keepAliveInitialDelay: 30000  // 30 seconds
+    // Removed invalid options: acquireTimeout, connectTimeout, timeout
 });
 
 // Get a promise-based wrapper for the pool

@@ -81,7 +81,7 @@ router.put('/modules/:moduleId/assignments/:assignmentId', [
 ], moduleController.updateAssignment);
 router.delete('/modules/:moduleId/assignments/:assignmentId', moduleController.deleteAssignment);
 router.post('/modules/:moduleId/assignments/:assignmentId/toggle-publish', moduleController.toggleAssignmentPublish);
-router.get('/modules/:moduleId/assignments/:assignmentId/submissions', moduleController.getAssignmentSubmissions);
+router.get('/modules/:moduleId/assignments/:assignmentId/submissions', moduleController.getSubmissions);
 router.get('/modules/:moduleId/assignments/:assignmentId/submissions/:submissionId', moduleController.getSubmission);
 router.post('/modules/:moduleId/assignments/:assignmentId/submissions/:submissionId/grade', moduleController.gradeSubmission);
 
