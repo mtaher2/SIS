@@ -295,7 +295,7 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // GPA Chart
-        const gpaData = <%= JSON.stringify(gpaHistory) %>;
+        const gpaData = JSON.stringify(gpaHistory);
         
         if (gpaData && gpaData.length > 0) {
             const ctx = document.getElementById('gpaChart').getContext('2d');
@@ -336,4 +336,10 @@
             document.getElementById('gpaChart').parentElement.innerHTML = '<div class="alert alert-info text-center">No GPA history available</div>';
         }
     });
-</script> 
+</script>
+
+<!-- Include Font Awesome if not already included -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<!-- Include Chatbot Component -->
+<%- include('../partials/chatbotStudent') %> 
