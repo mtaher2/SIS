@@ -184,7 +184,7 @@ app.listen(PORT, async () => {
 
     // Check if main chatbot service is available
     try {
-        const response = await fetch('http://localhost:5000/health');
+        const response = await fetch('http://localhost:5002/health');
         if (response.ok) {
             console.log('✅ Main chatbot service is running');
         } else {
