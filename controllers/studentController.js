@@ -733,6 +733,7 @@ exports.getAttendance = async (req, res) => {
 exports.getAnnouncements = async (req, res) => {
     try {
         const studentId = req.session.user.user_id;
+        const filter = req.query.filter;
         
         // Get all announcements visible to this student
         const announcements = await Announcement.getVisibleAnnouncements(
@@ -740,10 +741,19 @@ exports.getAnnouncements = async (req, res) => {
             'student'
         );
         
+        // Filter announcements by spam status if filter is set
+        let filteredAnnouncements = announcements;
+        if (filter === 'spam') {
+            filteredAnnouncements = announcements.filter(a => a.is_spam === 1);
+        } else if (filter === 'regular') {
+            filteredAnnouncements = announcements.filter(a => a.is_spam === 0);
+        }
+        
         res.render('student/announcements', {
             title: 'Announcements',
             user: req.session.user,
-            announcements
+            announcements: filteredAnnouncements,
+            filters: { is_spam: filter === 'spam' ? true : (filter === 'regular' ? false : undefined) }
         });
     } catch (error) {
         console.error('Error getting announcements:', error);

@@ -7,12 +7,26 @@
         </ol>
     </nav>
 
-    <div class="card mb-4">
+    <div class="card mb-4 <%= announcement.is_spam ? 'border-danger' : '' %>">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h3 class="mb-0"><%= announcement.title %></h3>
-            <span class="badge bg-primary"><%= announcement.target_type === 'all' ? 'Public' : announcement.target_type %></span>
+            <div>
+                <% if (announcement.is_spam) { %>
+                <span class="badge bg-danger me-1" title="Spam confidence: <%= Math.round(announcement.spam_confidence * 100) %>%">
+                    <i class="fas fa-exclamation-triangle"></i> Spam
+                </span>
+                <% } %>
+                <span class="badge bg-primary"><%= announcement.target_type === 'all' ? 'Public' : announcement.target_type %></span>
+            </div>
         </div>
         <div class="card-body">
+            <% if (announcement.is_spam) { %>
+            <div class="alert alert-warning mb-4">
+                <i class="fas fa-exclamation-triangle me-2"></i> 
+                This announcement has been identified as potential spam (confidence: <%= Math.round(announcement.spam_confidence * 100) %>%). 
+                Please review its content carefully.
+            </div>
+            <% } %>
             <div class="mb-4">
                 <p><%= announcement.content %></p>
             </div>

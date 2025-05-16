@@ -12,6 +12,15 @@
         </div>
     </div>
 
+    <!-- Spam filter controls -->
+    <div class="mb-4">
+        <div class="btn-group" role="group">
+            <a href="/student/announcements" class="btn btn-outline-primary <%= !filters || !filters.is_spam ? 'active' : '' %>">All</a>
+            <a href="/student/announcements?filter=regular" class="btn btn-outline-success <%= filters && filters.is_spam === false ? 'active' : '' %>">Regular</a>
+            <a href="/student/announcements?filter=spam" class="btn btn-outline-danger <%= filters && filters.is_spam === true ? 'active' : '' %>">Spam</a>
+        </div>
+    </div>
+
     <!-- Filter and Search -->
     <div class="card mb-4">
         <div class="card-body">
@@ -43,44 +52,70 @@
     </div>
 
     <!-- Announcements List -->
-    <div class="row">
-        <% if (announcements && announcements.length > 0) { %>
-            <% announcements.forEach(announcement => { %>
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100 announcement-card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><%= announcement.title %></h5>
-                            <% if (announcement.target_type === 'all') { %>
-                                <span class="badge bg-primary">All Users</span>
-                            <% } else if (announcement.target_type === 'student') { %>
-                                <span class="badge bg-info">Students</span>
-                            <% } else if (announcement.target_type === 'course') { %>
-                                <span class="badge bg-success">Course: <%= announcement.course_code || '' %></span>
-                            <% } %>
-                        </div>
-                        <div class="card-body">
-                            <div class="announcement-content mb-3">
-                                <%= announcement.content %>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mt-auto">
-                                <small class="text-muted">
-                                    <i class="fas fa-user me-1"></i> <%= announcement.creator_name || 'Unknown' %>
-                                </small>
-                                <small class="text-muted">
-                                    <i class="fas fa-calendar-alt me-1"></i> <%= new Date(announcement.created_at).toLocaleDateString() %>
-                                </small>
-                            </div>
-                        </div>
-                    </div>
+    <div class="card">
+        <div class="card-body">
+            <% if (announcements && announcements.length > 0) { %>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Target</th>
+                                <th>Created By</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Spam</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% announcements.forEach(announcement => { %>
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold"><%= announcement.title %></div>
+                                        <div class="small text-muted text-truncate" style="max-width: 300px;">
+                                            <%= announcement.content.substring(0, 100) %><%= announcement.content.length > 100 ? '...' : '' %>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <% if (announcement.target_type === 'all') { %>
+                                            <span class="badge bg-primary">All Users</span>
+                                        <% } else if (announcement.target_type === 'student') { %>
+                                            <span class="badge bg-info">Students</span>
+                                        <% } else if (announcement.target_type === 'course') { %>
+                                            <span class="badge bg-success">Course: <%= announcement.course_code || '' %></span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <%= announcement.creator_name || 'Unknown' %>
+                                    </td>
+                                    <td>
+                                        <%= new Date(announcement.created_at).toLocaleDateString() %>
+                                    </td>
+                                    <td>
+                                        <% if (announcement.is_active) { %>
+                                            <span class="badge bg-success">Active</span>
+                                        <% } else { %>
+                                            <span class="badge bg-danger">Inactive</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (announcement.is_spam) { %>
+                                            <span class="badge bg-danger" title="Confidence: <%= Math.round(announcement.spam_confidence * 100) %>%">Spam</span>
+                                        <% } else { %>
+                                            <span class="badge bg-success">OK</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
                 </div>
-            <% }); %>
-        <% } else { %>
-            <div class="col-12">
+            <% } else { %>
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i> No announcements available at this time.
                 </div>
-            </div>
-        <% } %>
+            <% } %>
+        </div>
     </div>
 
     <!-- Pagination -->

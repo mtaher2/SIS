@@ -9,15 +9,26 @@ router.use(isAuthenticated);
 // View all public announcements (requires authentication now)
 router.get('/', async (req, res) => {
     try {
-        const announcements = await Announcement.findAll({
+        const filter = req.query.filter;
+        const filters = {
             target_type: 'all',
             is_active: true
-        });
+        };
+        
+        // Apply spam filtering
+        if (filter === 'spam') {
+            filters.is_spam = true;
+        } else if (filter === 'regular') {
+            filters.is_spam = false;
+        }
+        
+        const announcements = await Announcement.findAll(filters);
         
         res.render('announcements/index', {
             title: 'Announcements',
             user: req.session.user,
-            announcements
+            announcements,
+            filters // Pass filters to template
         });
     } catch (error) {
         console.error('Error getting announcements:', error);
