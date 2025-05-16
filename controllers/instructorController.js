@@ -604,22 +604,33 @@ exports.postAddAssignment = async (req, res) => {
 
 // Announcement management
 exports.getAnnouncements = async (req, res) => {
-  try {
-    const instructorId = req.session.user.user_id;
-    const announcements = await Announcement.findAll({
-      created_by: instructorId,
-    });
-
-    res.render("instructor/announcements", {
-      title: "My Announcements",
-      user: req.session.user,
-      announcements,
-    });
-  } catch (error) {
-    console.error("Error getting announcements:", error);
-    req.flash("error_msg", "An error occurred while retrieving announcements");
-    res.redirect("/instructor/dashboard");
-  }
+    try {
+        const instructorId = req.session.user.user_id;
+        const filter = req.query.filter;
+        const filters = {
+            created_by: instructorId
+        };
+        
+        // Apply spam filtering
+        if (filter === 'spam') {
+            filters.is_spam = true;
+        } else if (filter === 'regular') {
+            filters.is_spam = false;
+        }
+        
+        const announcements = await Announcement.findAll(filters);
+        
+        res.render('instructor/announcements', {
+            title: 'My Announcements',
+            user: req.session.user,
+            announcements,
+            filters
+        });
+    } catch (error) {
+        console.error('Error getting announcements:', error);
+        req.flash('error_msg', 'An error occurred while retrieving announcements');
+        res.redirect('/instructor/dashboard');
+    }
 };
 
 // Create course announcement

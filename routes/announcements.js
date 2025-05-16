@@ -7,23 +7,34 @@ const Announcement = require("../models/Announcement");
 router.use(isAuthenticated);
 
 // View all public announcements (requires authentication now)
-router.get("/", async (req, res) => {
-  try {
-    const announcements = await Announcement.findAll({
-      target_type: "all",
-      is_active: true,
-    });
-
-    res.render("announcements/index", {
-      title: "Announcements",
-      user: req.session.user,
-      announcements,
-    });
-  } catch (error) {
-    console.error("Error getting announcements:", error);
-    req.flash("error_msg", "An error occurred while retrieving announcements");
-    res.redirect("/");
-  }
+router.get('/', async (req, res) => {
+    try {
+        const filter = req.query.filter;
+        const filters = {
+            target_type: 'all',
+            is_active: true
+        };
+        
+        // Apply spam filtering
+        if (filter === 'spam') {
+            filters.is_spam = true;
+        } else if (filter === 'regular') {
+            filters.is_spam = false;
+        }
+        
+        const announcements = await Announcement.findAll(filters);
+        
+        res.render('announcements/index', {
+            title: 'Announcements',
+            user: req.session.user,
+            announcements,
+            filters // Pass filters to template
+        });
+    } catch (error) {
+        console.error('Error getting announcements:', error);
+        req.flash('error_msg', 'An error occurred while retrieving announcements');
+        res.redirect('/');
+    }
 });
 
 // View single announcement

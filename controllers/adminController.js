@@ -559,33 +559,36 @@ exports.deleteCourse = async (req, res) => {
 
 // Announcement management - list all announcements
 exports.getAnnouncements = async (req, res) => {
-  try {
-    // Get search and filter parameters from query
-    const { search, target_type, status } = req.query;
-
-    // Prepare filters object
-    const filters = {};
-    if (search) filters.search = search;
-    if (target_type) filters.target_type = target_type;
-    if (status === "active") filters.is_active = true;
-    if (status === "inactive") filters.is_active = false;
-
-    // Fetch announcements with filters
-    const announcements = await Announcement.findAll(filters);
-
-    res.render("admin/announcements", {
-      title: "Announcement Management",
-      user: req.session.user,
-      announcements,
-      search,
-      target_type,
-      status,
-    });
-  } catch (error) {
-    console.error("Error getting announcements:", error);
-    req.flash("error_msg", "An error occurred while retrieving announcements");
-    res.redirect("/admin/dashboard");
-  }
+    try {
+        // Get search and filter parameters from query
+        const { search, target_type, status, filter } = req.query;
+        
+        // Prepare filters object
+        const filters = {};
+        if (search) filters.search = search;
+        if (target_type) filters.target_type = target_type;
+        if (status === 'active') filters.is_active = true;
+        if (status === 'inactive') filters.is_active = false;
+        if (filter === 'spam') {
+            filters.is_spam = true;
+        } else if (filter === 'regular') {
+            filters.is_spam = false;
+        }
+        
+        // Fetch announcements with filters
+        const announcements = await Announcement.findAll(filters);
+        
+        res.render('admin/announcements', {
+            title: 'Announcement Management',
+            user: req.session.user,
+            announcements,
+            filters
+        });
+    } catch (error) {
+        console.error('Error getting announcements:', error);
+        req.flash('error_msg', 'An error occurred while retrieving announcements');
+        res.redirect('/admin/dashboard');
+    }
 };
 
 // Announcement management - create announcement form

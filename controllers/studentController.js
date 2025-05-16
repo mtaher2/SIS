@@ -954,25 +954,35 @@ exports.getAttendance = async (req, res) => {
 
 // View announcements
 exports.getAnnouncements = async (req, res) => {
-  try {
-    const studentId = req.session.user.user_id;
-
-    // Get all announcements visible to this student
-    const announcements = await Announcement.getVisibleAnnouncements(
-      studentId,
-      "student",
-    );
-
-    res.render("student/announcements", {
-      title: "Announcements",
-      user: req.session.user,
-      announcements,
-    });
-  } catch (error) {
-    console.error("Error getting announcements:", error);
-    req.flash("error_msg", "An error occurred while retrieving announcements");
-    res.redirect("/student/dashboard");
-  }
+    try {
+        const studentId = req.session.user.user_id;
+        const filter = req.query.filter;
+        
+        // Get all announcements visible to this student
+        const announcements = await Announcement.getVisibleAnnouncements(
+            studentId, 
+            'student'
+        );
+        
+        // Filter announcements by spam status if filter is set
+        let filteredAnnouncements = announcements;
+        if (filter === 'spam') {
+            filteredAnnouncements = announcements.filter(a => a.is_spam === 1);
+        } else if (filter === 'regular') {
+            filteredAnnouncements = announcements.filter(a => a.is_spam === 0);
+        }
+        
+        res.render('student/announcements', {
+            title: 'Announcements',
+            user: req.session.user,
+            announcements: filteredAnnouncements,
+            filters: { is_spam: filter === 'spam' ? true : (filter === 'regular' ? false : undefined) }
+        });
+    } catch (error) {
+        console.error('Error getting announcements:', error);
+        req.flash('error_msg', 'An error occurred while retrieving announcements');
+        res.redirect('/student/dashboard');
+    }
 };
 
 // Get GPA calculator page
