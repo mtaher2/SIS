@@ -70,6 +70,7 @@ router.post('/announcements/edit/:id', [
     check('content', 'Content is required').notEmpty(),
     check('target_type', 'Target type is required').notEmpty()
 ], adminController.postEditAnnouncement);
+router.get('/announcements/:id', adminController.getAnnouncementDetails);
 router.delete('/announcements/delete/:id', adminController.deleteAnnouncement);
 
 // Method Override for DELETE requests

@@ -2,6 +2,15 @@ const axios = require('axios');
 
 // Configuration for spam detector API
 const SPAM_DETECTOR_API = 'http://127.0.0.1:5000/api';
+let isInitialized = false;
+
+/**
+ * Initialize the spam detector service
+ */
+function initialize() {
+    isInitialized = true;
+    console.log('Spam detector service initialized');
+}
 
 /**
  * Predicts if a message is spam or not
@@ -37,7 +46,20 @@ async function isServiceAvailable() {
     }
 }
 
+/**
+ * Checks if the spam detector is ready
+ * @returns {Promise<boolean>} - True if service is ready
+ */
+async function isReady() {
+    if (!isInitialized) {
+        return false;
+    }
+    return await isServiceAvailable();
+}
+
 module.exports = {
+    initialize,
     classifyMessage,
-    isServiceAvailable
+    isServiceAvailable,
+    isReady
 }; 

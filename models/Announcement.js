@@ -16,7 +16,25 @@ class Announcement {
                 WHERE a.announcement_id = ?`,
                 [id]
             );
-            return rows.length ? rows[0] : null;
+            
+            if (!rows.length) return null;
+            
+            // If announcement is targeting specific users, get the recipients
+            const announcement = rows[0];
+            if (announcement.target_type === 'specific_users') {
+                const [recipients] = await db.query(
+                    `SELECT ar.user_id, CONCAT(u.first_name, ' ', u.last_name) AS full_name, 
+                     r.role_name
+                     FROM announcement_recipients ar
+                     JOIN users u ON ar.user_id = u.user_id
+                     JOIN roles r ON u.role_id = r.role_id
+                     WHERE ar.announcement_id = ?`,
+                    [id]
+                );
+                announcement.recipients = recipients;
+            }
+            
+            return announcement;
         } catch (error) {
             console.error('Error finding announcement by ID:', error);
             throw error;
@@ -26,9 +44,13 @@ class Announcement {
     // Create a new announcement
     static async create(announcementData) {
         try {
+            // Start transaction
+            await db.query('START TRANSACTION');
+            
             // Classify the announcement content
             const spamClassification = await spamDetector.classifyMessage(announcementData.content);
             
+            // Create the announcement
             const [result] = await db.query(
                 `INSERT INTO announcements 
                 (title, content, created_by, target_type, course_id, is_active, is_spam, spam_confidence)
@@ -44,8 +66,25 @@ class Announcement {
                     spamClassification.confidence
                 ]
             );
-            return result.insertId;
+            
+            const announcementId = result.insertId;
+            
+            // If targeting specific users, add them to the recipients table
+            if (announcementData.target_type === 'specific_users' && Array.isArray(announcementData.recipients) && announcementData.recipients.length > 0) {
+                const values = announcementData.recipients.map(userId => [announcementId, userId]);
+                await db.query(
+                    `INSERT INTO announcement_recipients (announcement_id, user_id) VALUES ?`,
+                    [values]
+                );
+            }
+            
+            // Commit transaction
+            await db.query('COMMIT');
+            
+            return announcementId;
         } catch (error) {
+            // Rollback on error
+            await db.query('ROLLBACK');
             console.error('Error creating announcement:', error);
             throw error;
         }
@@ -54,6 +93,9 @@ class Announcement {
     // Update announcement
     static async update(id, announcementData) {
         try {
+            // Start transaction
+            await db.query('START TRANSACTION');
+            
             // Re-classify the content on update
             const spamClassification = await spamDetector.classifyMessage(announcementData.content);
             
@@ -78,8 +120,29 @@ class Announcement {
                     id
                 ]
             );
+            
+            // If targeting specific users, update the recipients
+            if (announcementData.target_type === 'specific_users' && Array.isArray(announcementData.recipients)) {
+                // First delete existing recipients
+                await db.query('DELETE FROM announcement_recipients WHERE announcement_id = ?', [id]);
+                
+                // Then add the new ones
+                if (announcementData.recipients.length > 0) {
+                    const values = announcementData.recipients.map(userId => [id, userId]);
+                    await db.query(
+                        `INSERT INTO announcement_recipients (announcement_id, user_id) VALUES ?`,
+                        [values]
+                    );
+                }
+            }
+            
+            // Commit transaction
+            await db.query('COMMIT');
+            
             return result.affectedRows > 0;
         } catch (error) {
+            // Rollback on error
+            await db.query('ROLLBACK');
             console.error('Error updating announcement:', error);
             throw error;
         }
@@ -148,6 +211,18 @@ class Announcement {
                 params.push(searchTerm, searchTerm, searchTerm);
             }
             
+            // Filter for specific recipient
+            if (filters.recipient_id) {
+                conditions.push(`(
+                    a.announcement_id IN (
+                        SELECT announcement_id 
+                        FROM announcement_recipients 
+                        WHERE user_id = ?
+                    )
+                )`);
+                params.push(filters.recipient_id);
+            }
+            
             if (conditions.length > 0) {
                 query += ` WHERE ${conditions.join(' AND ')}`;
             }
@@ -162,6 +237,42 @@ class Announcement {
             }
             
             const [rows] = await db.query(query, params);
+            
+            // For announcements targeting specific users, get the recipients
+            if (filters.include_recipients) {
+                const specificUserAnnouncements = rows.filter(a => a.target_type === 'specific_users');
+                
+                if (specificUserAnnouncements.length > 0) {
+                    const announcementIds = specificUserAnnouncements.map(a => a.announcement_id);
+                    
+                    const [recipients] = await db.query(
+                        `SELECT ar.announcement_id, ar.user_id, CONCAT(u.first_name, ' ', u.last_name) AS full_name,
+                            r.role_name
+                         FROM announcement_recipients ar
+                         JOIN users u ON ar.user_id = u.user_id
+                         JOIN roles r ON u.role_id = r.role_id
+                         WHERE ar.announcement_id IN (?)`,
+                        [announcementIds]
+                    );
+                    
+                    // Group recipients by announcement ID
+                    const recipientsByAnnouncement = recipients.reduce((acc, recipient) => {
+                        if (!acc[recipient.announcement_id]) {
+                            acc[recipient.announcement_id] = [];
+                        }
+                        acc[recipient.announcement_id].push(recipient);
+                        return acc;
+                    }, {});
+                    
+                    // Attach recipients to their announcements
+                    rows.forEach(announcement => {
+                        if (announcement.target_type === 'specific_users') {
+                            announcement.recipients = recipientsByAnnouncement[announcement.announcement_id] || [];
+                        }
+                    });
+                }
+            }
+            
             return rows;
         } catch (error) {
             console.error('Error finding announcements:', error);
@@ -176,7 +287,7 @@ class Announcement {
             let params;
             
             if (userRole === 'admin') {
-                // Admin can see all announcements
+                // Admin can see all announcements except those targeting specific users
                 query = `
                     SELECT a.*, CONCAT(u.first_name, ' ', u.last_name) AS author_name,
                         u.role_id, r.role_name,
@@ -186,11 +297,18 @@ class Announcement {
                     JOIN roles r ON u.role_id = r.role_id
                     LEFT JOIN courses c ON a.course_id = c.course_id
                     WHERE a.is_active = true
+                    AND (
+                        a.target_type != 'specific_users'
+                        OR (a.target_type = 'specific_users' AND a.announcement_id IN (
+                            SELECT announcement_id FROM announcement_recipients WHERE user_id = ?
+                        ))
+                    )
                     ORDER BY a.created_at DESC
                 `;
-                params = [];
+                params = [userId];
             } else if (userRole === 'instructor') {
-                // Instructors see all public announcements, instructor-targeted ones, and their course-specific ones
+                // Instructors see all public announcements, instructor-targeted ones, their course-specific ones,
+                // and announcements where they are specifically targeted
                 query = `
                     SELECT a.*, CONCAT(u.first_name, ' ', u.last_name) AS author_name,
                         u.role_id, r.role_name,
@@ -206,12 +324,16 @@ class Announcement {
                         OR (a.target_type = 'course' AND a.course_id IN (
                             SELECT course_id FROM course_instructors WHERE instructor_id = ?
                         ))
+                        OR (a.target_type = 'specific_users' AND a.announcement_id IN (
+                            SELECT announcement_id FROM announcement_recipients WHERE user_id = ?
+                        ))
                     )
                     ORDER BY a.created_at DESC
                 `;
-                params = [userId];
+                params = [userId, userId];
             } else if (userRole === 'student') {
-                // Students see all public announcements, student-targeted ones, and their enrolled course-specific ones
+                // Students see all public announcements, student-targeted ones, their enrolled course-specific ones,
+                // and announcements where they are specifically targeted
                 query = `
                     SELECT a.*, CONCAT(u.first_name, ' ', u.last_name) AS author_name,
                         u.role_id, r.role_name,
@@ -227,10 +349,13 @@ class Announcement {
                         OR (a.target_type = 'course' AND a.course_id IN (
                             SELECT course_id FROM enrollments WHERE student_id = ? AND status = 'active'
                         ))
+                        OR (a.target_type = 'specific_users' AND a.announcement_id IN (
+                            SELECT announcement_id FROM announcement_recipients WHERE user_id = ?
+                        ))
                     )
                     ORDER BY a.created_at DESC
                 `;
-                params = [userId];
+                params = [userId, userId];
             } else {
                 // For unauthenticated users or unknown roles, show only public announcements
                 query = `
@@ -251,6 +376,25 @@ class Announcement {
             return rows;
         } catch (error) {
             console.error('Error getting visible announcements:', error);
+            throw error;
+        }
+    }
+
+    // Get announcement recipients
+    static async getRecipients(announcementId) {
+        try {
+            const [rows] = await db.query(
+                `SELECT ar.user_id, CONCAT(u.first_name, ' ', u.last_name) AS full_name,
+                 r.role_name, u.email
+                 FROM announcement_recipients ar
+                 JOIN users u ON ar.user_id = u.user_id
+                 JOIN roles r ON u.role_id = r.role_id
+                 WHERE ar.announcement_id = ?`,
+                [announcementId]
+            );
+            return rows;
+        } catch (error) {
+            console.error('Error getting announcement recipients:', error);
             throw error;
         }
     }

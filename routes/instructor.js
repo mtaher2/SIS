@@ -120,5 +120,6 @@ router.post('/announcements/create', [
     check('content', 'Content is required').notEmpty(),
     check('target_type', 'Target type is required').notEmpty()
 ], instructorController.postCreateAnnouncement);
+router.get('/announcements/:id', instructorController.getAnnouncementDetails);
 
 module.exports = router; 
