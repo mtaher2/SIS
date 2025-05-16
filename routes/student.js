@@ -40,4 +40,7 @@ router.get('/announcements', studentController.getAnnouncements);
 router.get('/gpa-calculator', studentController.getGpaCalculator);
 router.post('/gpa-calculator', studentController.postGpaCalculator);
 
+router.post('/courses/:id/enroll', studentController.enrollInCourse);
+
+
 module.exports = router; 

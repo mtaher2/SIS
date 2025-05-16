@@ -318,7 +318,7 @@ exports.getCourse = async (req, res) => {
             is_active: true
         });
         
-        res.render('student/course-details', {
+        res.render('courses/view', {
             title: course.title,
             user: req.session.user,
             course,
@@ -694,8 +694,12 @@ exports.getGrades = async (req, res) => {
             user: req.session.user,
             courses,
             grades,
-            gpa
+            gpa,
+            currentSemester: courses.length > 0 ? courses[0].semester_name : null,
+            currentCourses: courses.filter(c => !c.is_completed) 
         });
+        
+        
     } catch (error) {
         console.error('Error getting grades:', error);
         req.flash('error_msg', 'An error occurred while retrieving your grades');
@@ -785,6 +789,23 @@ exports.getGpaCalculator = async (req, res) => {
         res.redirect('/student/dashboard');
     }
 };
+// Enroll in a course
+exports.enrollInCourse = async (req, res) => {
+    try {
+        const studentId = req.session.user.user_id;
+        const courseId = req.params.id || req.body.course_id;
+
+        await Course.enrollStudent(courseId, studentId);
+
+        req.flash('success_msg', 'You have successfully enrolled in the course.');
+        res.redirect('/student/courses');
+    } catch (error) {
+        console.error('Error enrolling in course:', error);
+        req.flash('error_msg', 'An error occurred while enrolling in the course.');
+        res.redirect('/courses');
+    }
+};
+
 
 // Calculate estimated GPA
 exports.postGpaCalculator = async (req, res) => {

@@ -82,18 +82,37 @@ router.get('/:id', isAuthenticated, async (req, res) => {
                 [courseId, studentId]
             );
             
-            if (rows.length > 0) {
-                return res.redirect(`/student/courses/${courseId}`);
-            }
+            const isEnrolled = rows.length > 0;
+            const enrolledCount = await Course.getEnrollmentCount(courseId);
+            const materialsCount = await Course.getMaterialsCount(courseId);
+
+            return res.render('courses/view', {
+                title: course.title,
+                user: req.session.user,
+                course,
+                instructors,
+                isEnrolled,
+                canEnroll: !isEnrolled,
+                enrolledCount,
+                materialsCount
+            });
+
         }
-        
         // Default view for authenticated users who aren't enrolled/assigned
+        const enrolledCount = await Course.getEnrollmentCount(courseId);
+        const materialsCount = await Course.getMaterialsCount(courseId);
+
         res.render('courses/view', {
             title: course.title,
             user: req.session.user,
             course,
-            instructors
+            instructors,
+            isEnrolled: false,
+            canEnroll: true,
+            enrolledCount,
+            materialsCount
         });
+
     } catch (error) {
         console.error('Error viewing course:', error);
         req.flash('error_msg', 'An error occurred while retrieving the course');

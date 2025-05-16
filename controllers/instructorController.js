@@ -687,6 +687,23 @@ exports.getGradeAssignment = async (req, res) => {
         res.redirect(`/instructor/courses/${req.params.courseId}`);
     }
 };
+// Enroll in course
+exports.enrollInCourse = async (req, res) => {
+    try {
+        const studentId = req.session.user.user_id;
+        const courseId = req.params.id;
+
+        await Course.enrollStudent(courseId, studentId);
+
+        req.flash('success_msg', 'You have successfully enrolled in the course.');
+        res.redirect('/student/courses');
+    } catch (error) {
+        console.error('Error enrolling in course:', error);
+        req.flash('error_msg', 'An error occurred while enrolling in the course.');
+        res.redirect('/courses');
+    }
+};
+
 
 // Process grading form
 exports.postGradeAssignment = async (req, res) => {
