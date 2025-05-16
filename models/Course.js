@@ -384,6 +384,32 @@ class Course {
             throw error;
         }
     }
+    static async getEnrollmentCount(courseId) {
+        try {
+            const [rows] = await db.query(
+                'SELECT COUNT(*) AS count FROM enrollments WHERE course_id = ? AND status = "active"',
+                [courseId]
+            );
+            return rows[0].count;
+        } catch (error) {
+            console.error('Error getting enrollment count:', error);
+            throw error;
+        }
+    }
+    // Get number of materials for a course
+    static async getMaterialsCount(courseId) {
+        try {
+            const [rows] = await db.query(
+                'SELECT COUNT(*) AS count FROM materials WHERE course_id = ?',
+                [courseId]
+            );
+            return rows[0].count;
+        } catch (error) {
+            console.error('Error getting materials count:', error);
+            throw error;
+        }
+    }
+
 
     // Delete assignment
     static async deleteAssignment(assignmentId) {
