@@ -98,9 +98,7 @@
                                             <div class="small text-muted"><%= announcement.course_code || 'Unknown Course' %></div>
                                         <% } %>
                                     </td>
-                                    <td>
-                                        <%= announcement.creator_name || 'Unknown' %>
-                                    </td>
+                                                                        <td>                                        <%= announcement.author_name || 'Unknown' %>                                    </td>
                                     <td>
                                         <%= new Date(announcement.created_at).toLocaleDateString() %>
                                     </td>

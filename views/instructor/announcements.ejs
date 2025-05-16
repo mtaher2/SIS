@@ -65,14 +65,7 @@
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Target</th>
-                                <th>Date</th>
-                                <th>Status</th>
-                                <th>Spam</th>
-                                <th class="text-end">Actions</th>
-                            </tr>
+                                                        <tr>                                <th>Title</th>                                <th>Target</th>                                <th>Created By</th>                                <th>Date</th>                                <th>Status</th>                                <th>Spam</th>                                <th class="text-end">Actions</th>                            </tr>
                         </thead>
                         <tbody>
                             <% announcements.forEach(announcement => { %>
@@ -92,9 +85,7 @@
                                             <span class="badge bg-success">Course</span>
                                             <div class="small text-muted"><%= announcement.course_code || 'Unknown Course' %></div>
                                         <% } %>
-                                    </td>
-                                    <td>
-                                        <%= new Date(announcement.created_at).toLocaleDateString() %>
+                                                                        </td>                                    <td>                                        <%= announcement.author_name || 'Unknown' %>                                    </td>                                    <td>                                        <%= new Date(announcement.created_at).toLocaleDateString() %>
                                     </td>
                                     <td>
                                         <% if (announcement.is_active) { %>
