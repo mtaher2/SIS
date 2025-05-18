@@ -175,7 +175,7 @@ runMigrations().then(() => {
     // Start the server
     app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
-        
+        console.log(`http://localhost:${PORT}`);
         // Initialize the spam detector
         try {
             console.log('Initializing spam detection service...');
