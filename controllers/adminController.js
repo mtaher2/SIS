@@ -5,6 +5,7 @@ const Course = require("../models/Course");
 const Announcement = require("../models/Announcement");
 const { validationResult } = require("express-validator");
 const db = require("../db");
+const { generateRandomPassword, sendWelcomeEmail } = require("../utils/passwordUtils");
 
 // Admin dashboard
 exports.getDashboard = async (req, res) => {
@@ -115,7 +116,7 @@ exports.postCreateUser = async (req, res) => {
       });
     }
 
-    const { username, email, password, first_name, last_name, role } = req.body;
+    const { username, email, first_name, last_name, role } = req.body;
 
     // Check if username already exists
     const existingUsername = await User.findByUsername(username);
@@ -131,6 +132,9 @@ exports.postCreateUser = async (req, res) => {
       return res.redirect("/admin/users/create");
     }
 
+    // Generate random password
+    const password = generateRandomPassword();
+
     // Create user
     const userData = {
       username,
@@ -142,6 +146,15 @@ exports.postCreateUser = async (req, res) => {
     };
 
     const userId = await User.create(userData);
+
+    // Send welcome email with password
+    const emailSent = await sendWelcomeEmail(email, first_name, last_name, password, role, username);
+    if (!emailSent) {
+      console.error("Failed to send welcome email to:", email);
+      req.flash("warning_msg", "User created but failed to send welcome email");
+    } else {
+      req.flash("success_msg", "User created successfully and welcome email sent");
+    }
 
     // Create additional profile data based on role
     if (role === "student") {
@@ -166,7 +179,6 @@ exports.postCreateUser = async (req, res) => {
       await Instructor.create(instructorData);
     }
 
-    req.flash("success_msg", "User created successfully");
     res.redirect("/admin/users");
   } catch (error) {
     console.error("Error creating user:", error);

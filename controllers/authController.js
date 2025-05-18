@@ -50,7 +50,18 @@ exports.postLogin = async (req, res) => {
     const { password: _, ...userWithoutPassword } = user;
     req.session.user = userWithoutPassword;
 
-    // Redirect based on role
+    // Check if this is first login (created_at equals updated_at)
+    if (user.created_at && user.updated_at) {
+      const createdTime = user.created_at.getTime();
+      const updatedTime = user.updated_at.getTime();
+      
+      // If timestamps are within 1 second of each other, redirect to update password
+      if (Math.abs(createdTime - updatedTime) < 1000) {
+        return res.redirect('/auth/update-password');
+      }
+    }
+
+    // If not first login, proceed with role-based routing
     if (user.role === "admin") {
       return res.redirect("/admin/dashboard");
     } else if (user.role === "instructor") {
@@ -247,4 +258,78 @@ exports.postChangePassword = async (req, res) => {
     req.flash("error_msg", "An error occurred. Please try again later.");
     res.redirect("/auth/change-password");
   }
+};
+
+// Middleware to check if user needs to update password
+exports.checkPasswordUpdate = async (req, res, next) => {
+    try {
+        if (!req.session.user) {
+            return next();
+        }
+
+        const user = await User.findById(req.session.user.user_id);
+        
+        // Check if created_at and updated_at are the same (first login)
+        if (user && user.created_at && user.updated_at) {
+            // Compare timestamps by converting to milliseconds since epoch
+            const createdTime = user.created_at.getTime();
+            const updatedTime = user.updated_at.getTime();
+            
+            // If the timestamps are within 1 second of each other, consider it first login
+            if (Math.abs(createdTime - updatedTime) < 1000) {
+                return res.redirect('/auth/update-password');
+            }
+        }
+        
+        next();
+    } catch (error) {
+        console.error('Error checking password update:', error);
+        next();
+    }
+};
+
+// Get update password page
+exports.getUpdatePassword = (req, res) => {
+    res.render('auth/update-password', {
+        title: 'Update Password',
+        user: req.session.user
+    });
+};
+
+// Process update password form
+exports.postUpdatePassword = async (req, res) => {
+    try {
+        const { new_password, confirm_password } = req.body;
+        const userId = req.session.user.user_id;
+
+        // Validate passwords match
+        if (new_password !== confirm_password) {
+            req.flash('error_msg', 'Passwords do not match');
+            return res.redirect('/auth/update-password');
+        }
+
+        // Validate password strength
+        if (new_password.length < 8) {
+            req.flash('error_msg', 'Password must be at least 8 characters long');
+            return res.redirect('/auth/update-password');
+        }
+
+        // Update password and updated_at timestamp
+        await User.updatePassword(userId, new_password);
+
+        // Set flash message before destroying session
+        req.flash('success_msg', 'Password updated successfully. Please login with your new password.');
+        
+        // Destroy the session to force re-login
+        req.session.destroy((err) => {
+            if (err) {
+                console.error('Error destroying session:', err);
+            }
+            res.redirect('/auth/login');
+        });
+    } catch (error) {
+        console.error('Update password error:', error);
+        req.flash('error_msg', 'An error occurred while updating your password');
+        res.redirect('/auth/update-password');
+    }
 };

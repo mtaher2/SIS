@@ -53,4 +53,11 @@ router.post(
   authController.postChangePassword,
 );
 
+// Update password routes
+router.get('/update-password', isAuthenticated, authController.getUpdatePassword);
+router.post('/update-password', isAuthenticated, [
+    check('new_password', 'New password must be at least 8 characters').isLength({ min: 8 }),
+    check('confirm_password', 'Passwords must match').custom((value, { req }) => value === req.body.new_password)
+], authController.postUpdatePassword);
+
 module.exports = router;

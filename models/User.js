@@ -71,11 +71,11 @@ class User {
 
       const roleId = roleRows[0].role_id;
 
-      // Insert user
+      // Insert user with created_at and updated_at timestamps
       const [result] = await db.query(
         `INSERT INTO users 
-                (username, password, email, first_name, last_name, role_id) 
-                VALUES (?, ?, ?, ?, ?, ?)`,
+                (username, password, email, first_name, last_name, role_id, created_at, updated_at) 
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
         [
           userData.username,
           hashedPassword,
@@ -126,9 +126,9 @@ class User {
       // Hash the new password
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-      // Update password
+      // Update password and updated_at timestamp
       const [result] = await db.query(
-        "UPDATE users SET password = ? WHERE user_id = ?",
+        "UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
         [hashedPassword, id],
       );
 
