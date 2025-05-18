@@ -35,8 +35,9 @@
                             <label for="target_type" class="form-label">Target Audience</label>
                             <select class="form-select" id="target_type" name="target_type" required>
                                 <option value="">Select target audience</option>
-                                <option value="instructor" <%= (locals.formData ? formData.target_type === 'instructor' : announcement.target_type === 'instructor') ? 'selected' : '' %>>All Instructors</option>
-                                <option value="course" <%= (locals.formData ? formData.target_type === 'course' : announcement.target_type === 'course') ? 'selected' : '' %>>Specific Course</option>
+                                <option value="instructors" <%= (locals.formData ? formData.target_type : announcement.target_type) === 'instructors' ? 'selected' : '' %>>All Instructors</option>
+                                <option value="course" <%= (locals.formData ? formData.target_type : announcement.target_type) === 'course' ? 'selected' : '' %>>Specific Course</option>
+                                <option value="specific_users" <%= (locals.formData ? formData.target_type : announcement.target_type) === 'specific_users' ? 'selected' : '' %>>Specific Users</option>
                             </select>
                         </div>
 

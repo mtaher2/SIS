@@ -36,9 +36,10 @@
                             <select class="form-select" id="target_type" name="target_type" required>
                                 <option value="">Select target audience</option>
                                 <option value="all" <%= locals.formData && formData.target_type === 'all' ? 'selected' : '' %>>All Users</option>
-                                <option value="student" <%= locals.formData && formData.target_type === 'student' ? 'selected' : '' %>>All Students</option>
-                                <option value="instructor" <%= locals.formData && formData.target_type === 'instructor' ? 'selected' : '' %>>All Instructors</option>
+                                <option value="students" <%= locals.formData && formData.target_type === 'students' ? 'selected' : '' %>>All Students</option>
+                                <option value="instructors" <%= locals.formData && formData.target_type === 'instructors' ? 'selected' : '' %>>All Instructors</option>
                                 <option value="course" <%= locals.formData && formData.target_type === 'course' ? 'selected' : '' %>>Specific Course</option>
+                                <option value="specific_users" <%= locals.formData && formData.target_type === 'specific_users' ? 'selected' : '' %>>Specific Users</option>
                             </select>
                         </div>
 
@@ -56,6 +57,93 @@
                                 <% } %>
                             </select>
                         </div>
+                        
+                        <div id="specific-users-selection" class="mb-3" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card mb-3">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">Select Students</h6>
+                                        </div>
+                                        <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                                            <div class="mb-2">
+                                                <input type="text" class="form-control form-control-sm" id="studentSearch" placeholder="Search students...">
+                                            </div>
+                                            <div class="student-list">
+                                                <% if (locals.students && students.length > 0) { %>
+                                                    <% students.forEach(student => { %>
+                                                        <div class="form-check student-item">
+                                                            <input class="form-check-input student-checkbox" type="checkbox" 
+                                                                name="specific_users" value="<%= student.user_id %>" 
+                                                                id="student-<%= student.user_id %>"
+                                                                <%= locals.formData && formData.specific_users && 
+                                                                    (Array.isArray(formData.specific_users) ? 
+                                                                        formData.specific_users.includes(student.user_id.toString()) : 
+                                                                        formData.specific_users === student.user_id.toString()) ? 
+                                                                    'checked' : '' %>>
+                                                            <label class="form-check-label" for="student-<%= student.user_id %>">
+                                                                <%= student.first_name %> <%= student.last_name %> (<%= student.email %>)
+                                                            </label>
+                                                        </div>
+                                                    <% }); %>
+                                                <% } else { %>
+                                                    <p class="text-muted">No students found</p>
+                                                <% } %>
+                                            </div>
+                                        </div>
+                                        <div class="card-footer">
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="checkbox" id="selectAllStudents">
+                                                <label class="form-check-label" for="selectAllStudents">
+                                                    Select/Unselect All Students
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">Select Instructors</h6>
+                                        </div>
+                                        <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                                            <div class="mb-2">
+                                                <input type="text" class="form-control form-control-sm" id="instructorSearch" placeholder="Search instructors...">
+                                            </div>
+                                            <div class="instructor-list">
+                                                <% if (locals.instructors && instructors.length > 0) { %>
+                                                    <% instructors.forEach(instructor => { %>
+                                                        <div class="form-check instructor-item">
+                                                            <input class="form-check-input instructor-checkbox" type="checkbox" 
+                                                                name="specific_users" value="<%= instructor.user_id %>" 
+                                                                id="instructor-<%= instructor.user_id %>"
+                                                                <%= locals.formData && formData.specific_users && 
+                                                                    (Array.isArray(formData.specific_users) ? 
+                                                                        formData.specific_users.includes(instructor.user_id.toString()) : 
+                                                                        formData.specific_users === instructor.user_id.toString()) ? 
+                                                                    'checked' : '' %>>
+                                                            <label class="form-check-label" for="instructor-<%= instructor.user_id %>">
+                                                                <%= instructor.first_name %> <%= instructor.last_name %> (<%= instructor.email %>)
+                                                            </label>
+                                                        </div>
+                                                    <% }); %>
+                                                <% } else { %>
+                                                    <p class="text-muted">No instructors found</p>
+                                                <% } %>
+                                            </div>
+                                        </div>
+                                        <div class="card-footer">
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="checkbox" id="selectAllInstructors">
+                                                <label class="form-check-label" for="selectAllInstructors">
+                                                    Select/Unselect All Instructors
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="d-flex mt-4">
                             <button type="submit" class="btn btn-primary me-2">Create Announcement</button>
@@ -72,21 +160,106 @@
     document.addEventListener('DOMContentLoaded', function() {
         const targetTypeSelect = document.getElementById('target_type');
         const courseSelection = document.getElementById('course-selection');
+        const specificUsersSelection = document.getElementById('specific-users-selection');
         
-        function updateCourseSelection() {
+        // Select all checkboxes
+        const selectAllStudents = document.getElementById('selectAllStudents');
+        const selectAllInstructors = document.getElementById('selectAllInstructors');
+        const studentCheckboxes = document.querySelectorAll('.student-checkbox');
+        const instructorCheckboxes = document.querySelectorAll('.instructor-checkbox');
+        
+        // Search functionality
+        const studentSearch = document.getElementById('studentSearch');
+        const instructorSearch = document.getElementById('instructorSearch');
+        const studentItems = document.querySelectorAll('.student-item');
+        const instructorItems = document.querySelectorAll('.instructor-item');
+        
+        function updateSelections() {
             if (targetTypeSelect.value === 'course') {
                 courseSelection.style.display = 'block';
+                specificUsersSelection.style.display = 'none';
                 document.getElementById('course_id').setAttribute('required', 'required');
+            } else if (targetTypeSelect.value === 'specific_users') {
+                courseSelection.style.display = 'none';
+                specificUsersSelection.style.display = 'block';
+                document.getElementById('course_id').removeAttribute('required');
             } else {
                 courseSelection.style.display = 'none';
+                specificUsersSelection.style.display = 'none';
                 document.getElementById('course_id').removeAttribute('required');
             }
         }
         
         // Initial update
-        updateCourseSelection();
+        updateSelections();
         
         // Update whenever selection changes
-        targetTypeSelect.addEventListener('change', updateCourseSelection);
+        targetTypeSelect.addEventListener('change', updateSelections);
+        
+        // Select/deselect all students
+        selectAllStudents.addEventListener('change', function() {
+            studentCheckboxes.forEach(checkbox => {
+                const parentItem = checkbox.closest('.student-item');
+                if (parentItem.style.display !== 'none') {
+                    checkbox.checked = this.checked;
+                }
+            });
+        });
+        
+        // Select/deselect all instructors
+        selectAllInstructors.addEventListener('change', function() {
+            instructorCheckboxes.forEach(checkbox => {
+                const parentItem = checkbox.closest('.instructor-item');
+                if (parentItem.style.display !== 'none') {
+                    checkbox.checked = this.checked;
+                }
+            });
+        });
+        
+        // Student search functionality
+        studentSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            let hasVisibleItems = false;
+            
+            studentItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    item.style.display = '';
+                    hasVisibleItems = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Update "select all" checkbox state
+            if (!hasVisibleItems) {
+                selectAllStudents.disabled = true;
+            } else {
+                selectAllStudents.disabled = false;
+            }
+        });
+        
+        // Instructor search functionality
+        instructorSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            let hasVisibleItems = false;
+            
+            instructorItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    item.style.display = '';
+                    hasVisibleItems = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Update "select all" checkbox state
+            if (!hasVisibleItems) {
+                selectAllInstructors.disabled = true;
+            } else {
+                selectAllInstructors.disabled = false;
+            }
+        });
     });
 </script> 

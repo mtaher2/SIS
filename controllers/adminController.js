@@ -564,10 +564,18 @@ exports.getCreateAnnouncement = async (req, res) => {
         // Get courses for targeting announcement to a specific course
         const courses = await Course.findAll({ is_active: true });
         
+        // Get all students for targeting specific students
+        const students = await User.findByRole('student');
+        
+        // Get all instructors for targeting specific instructors
+        const instructors = await User.findByRole('instructor');
+        
         res.render('admin/create-announcement', {
             title: 'Create Announcement',
             user: req.session.user,
-            courses
+            courses,
+            students,
+            instructors
         });
     } catch (error) {
         console.error('Error getting data for announcement creation:', error);
@@ -585,17 +593,21 @@ exports.postCreateAnnouncement = async (req, res) => {
         if (!errors.isEmpty()) {
             // Retrieve data for form again
             const courses = await Course.findAll({ is_active: true });
+            const students = await User.findByRole('student');
+            const instructors = await User.findByRole('instructor');
             
             return res.status(400).render('admin/create-announcement', {
                 title: 'Create Announcement',
                 user: req.session.user,
                 courses,
+                students,
+                instructors,
                 errors: errors.array(),
                 formData: req.body
             });
         }
         
-        const { title, content, target_type, course_id } = req.body;
+        const { title, content, target_type, course_id, specific_users } = req.body;
         
         // Create announcement
         const announcementData = {
@@ -607,6 +619,13 @@ exports.postCreateAnnouncement = async (req, res) => {
             is_active: true
         };
         
+        // If targeting specific users, add them to the recipients
+        if (target_type === 'specific_users' && specific_users) {
+            // Convert to array if it's not already (happens when only one user is selected)
+            const recipients = Array.isArray(specific_users) ? specific_users : [specific_users];
+            announcementData.recipients = recipients;
+        }
+        
         await Announcement.create(announcementData);
         
         req.flash('success_msg', 'Announcement created successfully');
@@ -615,6 +634,34 @@ exports.postCreateAnnouncement = async (req, res) => {
         console.error('Error creating announcement:', error);
         req.flash('error_msg', 'An error occurred while creating the announcement');
         res.redirect('/admin/announcements/create');
+    }
+};
+
+// Announcement management - view announcement details
+exports.getAnnouncementDetails = async (req, res) => {
+    try {
+        const announcementId = req.params.id;
+        const announcement = await Announcement.findById(announcementId);
+        
+        if (!announcement) {
+            req.flash('error_msg', 'Announcement not found');
+            return res.redirect('/admin/announcements');
+        }
+        
+        // If it's targeting specific users, get the recipients
+        if (announcement.target_type === 'specific_users' && !announcement.recipients) {
+            announcement.recipients = await Announcement.getRecipients(announcementId);
+        }
+        
+        res.render('admin/announcement-details', {
+            title: 'Announcement Details',
+            user: req.session.user,
+            announcement
+        });
+    } catch (error) {
+        console.error('Error viewing announcement details:', error);
+        req.flash('error_msg', 'An error occurred while retrieving the announcement');
+        res.redirect('/admin/announcements');
     }
 };
 
@@ -632,11 +679,24 @@ exports.getEditAnnouncement = async (req, res) => {
         // Get courses for targeting announcement to a specific course
         const courses = await Course.findAll({ is_active: true });
         
+        // Get all students for targeting specific students
+        const students = await User.findByRole('student');
+        
+        // Get all instructors for targeting specific instructors
+        const instructors = await User.findByRole('instructor');
+        
+        // If targeting specific users, get the recipients
+        if (announcement.target_type === 'specific_users' && !announcement.recipients) {
+            announcement.recipients = await Announcement.getRecipients(announcementId);
+        }
+        
         res.render('admin/edit-announcement', {
             title: 'Edit Announcement',
             user: req.session.user,
             announcement,
-            courses
+            courses,
+            students,
+            instructors
         });
     } catch (error) {
         console.error('Error getting announcement for edit:', error);
@@ -657,18 +717,22 @@ exports.postEditAnnouncement = async (req, res) => {
             // Retrieve data for form again
             const announcement = await Announcement.findById(announcementId);
             const courses = await Course.findAll({ is_active: true });
+            const students = await User.findByRole('student');
+            const instructors = await User.findByRole('instructor');
             
             return res.status(400).render('admin/edit-announcement', {
                 title: 'Edit Announcement',
                 user: req.session.user,
                 announcement,
                 courses,
+                students,
+                instructors,
                 errors: errors.array(),
                 formData: req.body
             });
         }
         
-        const { title, content, target_type, course_id, is_active } = req.body;
+        const { title, content, target_type, course_id, is_active, specific_users } = req.body;
         
         // Update announcement
         const announcementData = {
@@ -678,6 +742,13 @@ exports.postEditAnnouncement = async (req, res) => {
             course_id: target_type === 'course' ? course_id : null,
             is_active: is_active === 'true'
         };
+        
+        // If targeting specific users, add them to the recipients
+        if (target_type === 'specific_users' && specific_users) {
+            // Convert to array if it's not already (happens when only one user is selected)
+            const recipients = Array.isArray(specific_users) ? specific_users : [specific_users];
+            announcementData.recipients = recipients;
+        }
         
         await Announcement.update(announcementId, announcementData);
         

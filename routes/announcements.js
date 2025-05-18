@@ -6,12 +6,35 @@ const Announcement = require('../models/Announcement');
 // Apply authentication middleware to all announcement routes
 router.use(isAuthenticated);
 
+// Create announcement route (redirects based on user role)
+router.get('/create', (req, res) => {
+    if (!req.session.user) {
+        return res.redirect('/auth/login');
+    }
+    
+    if (req.session.user.role === 'admin') {
+        return res.redirect('/admin/announcements/create');
+    } else if (req.session.user.role === 'instructor') {
+        return res.redirect('/instructor/announcements/create');
+    } else {
+        // Students can't create announcements
+        req.flash('error_msg', 'You do not have permission to create announcements');
+        return res.redirect('/announcements');
+    }
+});
+
 // View all public announcements (requires authentication now)
 router.get('/', async (req, res) => {
     try {
         const filter = req.query.filter;
+        const userId = req.session.user.user_id;
+        const userRole = req.session.user.role;
+        
+        // Get all announcements visible to this user
+        let announcements;
+        
+        // Prepare filters object for spam filtering
         const filters = {
-            target_type: 'all',
             is_active: true
         };
         
@@ -22,7 +45,8 @@ router.get('/', async (req, res) => {
             filters.is_spam = false;
         }
         
-        const announcements = await Announcement.findAll(filters);
+        // Get announcements based on user role
+        announcements = await Announcement.getVisibleAnnouncements(userId, userRole, filters);
         
         res.render('announcements/index', {
             title: 'Announcements',
