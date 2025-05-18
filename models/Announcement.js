@@ -211,6 +211,12 @@ class Announcement {
                 params.push(`%${filters.search}%`);
             }
             
+            // Filter by creation date
+            if (filters.created_after) {
+                conditions.push('a.created_at > ?');
+                params.push(filters.created_after);
+            }
+            
             // Filter for specific recipient
             if (filters.recipient_id) {
                 conditions.push(`(
@@ -255,13 +261,20 @@ class Announcement {
     }
 
     // Get announcements visible to a specific user
-    static async getVisibleAnnouncements(userId, userRole) {
+    static async getVisibleAnnouncements(userId, userRole, filters = {}) {
         try {
             let query;
-            let params;
+            let params = [];
+            let conditions = ['a.is_active = true'];
+            
+            // Add date filter if provided
+            if (filters.created_after) {
+                conditions.push('a.created_at > ?');
+                params.push(filters.created_after);
+            }
             
             if (userRole === 'admin') {
-                // Admin can see all announcements except those targeting specific users
+                // Admin can see all announcements
                 query = `
                     SELECT a.*, CONCAT(u.first_name, ' ', u.last_name) AS author_name,
                         u.role_id, r.role_name,
@@ -270,16 +283,9 @@ class Announcement {
                     JOIN users u ON a.created_by = u.user_id
                     JOIN roles r ON u.role_id = r.role_id
                     LEFT JOIN courses c ON a.course_id = c.course_id
-                    WHERE a.is_active = true
-                    AND (
-                        a.target_type != 'specific_users'
-                        OR (a.target_type = 'specific_users' AND a.announcement_id IN (
-                            SELECT announcement_id FROM announcement_recipients WHERE user_id = ?
-                        ))
-                    )
+                    WHERE ${conditions.join(' AND ')}
                     ORDER BY a.created_at DESC
                 `;
-                params = [userId];
             } else if (userRole === 'instructor') {
                 // Instructors see all public announcements, instructor-targeted ones, their course-specific ones,
                 // and announcements where they are specifically targeted
@@ -291,20 +297,19 @@ class Announcement {
                     JOIN users u ON a.created_by = u.user_id
                     JOIN roles r ON u.role_id = r.role_id
                     LEFT JOIN courses c ON a.course_id = c.course_id
-                    WHERE a.is_active = true
+                    LEFT JOIN announcement_recipients ar ON a.announcement_id = ar.announcement_id AND ar.user_id = ?
+                    WHERE ${conditions.join(' AND ')}
                     AND (
                         a.target_type = 'all'
                         OR a.target_type = 'instructors'
                         OR (a.target_type = 'course' AND a.course_id IN (
                             SELECT course_id FROM course_instructors WHERE instructor_id = ?
                         ))
-                        OR (a.target_type = 'specific_users' AND a.announcement_id IN (
-                            SELECT announcement_id FROM announcement_recipients WHERE user_id = ?
-                        ))
+                        OR (a.target_type = 'specific_users' AND ar.user_id IS NOT NULL)
                     )
                     ORDER BY a.created_at DESC
                 `;
-                params = [userId, userId];
+                params.push(userId, userId);
             } else if (userRole === 'student') {
                 // Students see all public announcements, student-targeted ones, their enrolled course-specific ones,
                 // and announcements where they are specifically targeted
@@ -316,20 +321,19 @@ class Announcement {
                     JOIN users u ON a.created_by = u.user_id
                     JOIN roles r ON u.role_id = r.role_id
                     LEFT JOIN courses c ON a.course_id = c.course_id
-                    WHERE a.is_active = true
+                    LEFT JOIN announcement_recipients ar ON a.announcement_id = ar.announcement_id AND ar.user_id = ?
+                    WHERE ${conditions.join(' AND ')}
                     AND (
                         a.target_type = 'all'
                         OR a.target_type = 'students'
                         OR (a.target_type = 'course' AND a.course_id IN (
                             SELECT course_id FROM enrollments WHERE student_id = ? AND status = 'active'
                         ))
-                        OR (a.target_type = 'specific_users' AND a.announcement_id IN (
-                            SELECT announcement_id FROM announcement_recipients WHERE user_id = ?
-                        ))
+                        OR (a.target_type = 'specific_users' AND ar.user_id IS NOT NULL)
                     )
                     ORDER BY a.created_at DESC
                 `;
-                params = [userId, userId];
+                params.push(userId, userId);
             } else {
                 // For unauthenticated users or unknown roles, show only public announcements
                 query = `
@@ -340,10 +344,9 @@ class Announcement {
                     JOIN users u ON a.created_by = u.user_id
                     JOIN roles r ON u.role_id = r.role_id
                     LEFT JOIN courses c ON a.course_id = c.course_id
-                    WHERE a.is_active = true AND a.target_type = 'all'
+                    WHERE ${conditions.join(' AND ')} AND a.target_type = 'all'
                     ORDER BY a.created_at DESC
                 `;
-                params = [];
             }
             
             const [rows] = await db.query(query, params);

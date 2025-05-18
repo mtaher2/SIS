@@ -31,7 +31,21 @@
                                         <i class="fas fa-exclamation-triangle"></i> Spam
                                     </span>
                                 <% } %>
-                                <span class="badge bg-primary"><%= announcement.target_type === 'all' ? 'Public' : announcement.target_type %></span>
+                                <% if (announcement.target_type === 'all') { %>
+                                    <span class="badge bg-primary">All Users</span>
+                                <% } else if (announcement.target_type === 'students') { %>
+                                    <span class="badge bg-success">All Students</span>
+                                <% } else if (announcement.target_type === 'instructors') { %>
+                                    <span class="badge bg-warning text-dark">All Instructors</span>
+                                <% } else if (announcement.target_type === 'course') { %>
+                                    <span class="badge bg-info">
+                                        Course: <%= announcement.course_code || 'Unknown' %>
+                                    </span>
+                                <% } else if (announcement.target_type === 'specific_users') { %>
+                                    <span class="badge bg-secondary">Specific Users</span>
+                                <% } else { %>
+                                    <span class="badge bg-primary"><%= announcement.target_type %></span>
+                                <% } %>
                             </div>
                         </div>
                         <div class="card-body">

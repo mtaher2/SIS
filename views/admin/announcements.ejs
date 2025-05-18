@@ -31,7 +31,7 @@
                     <select class="form-select" id="target_type" name="target_type">
                         <option value="">All Targets</option>
                         <option value="all" <%= locals.target_type === 'all' ? 'selected' : '' %>>All Users</option>
-                        <option value="student" <%= locals.target_type === 'student' ? 'selected' : '' %>>Students</option>
+                        <option value="students" <%= locals.target_type === 'students' ? 'selected' : '' %>>Students</option>
                         <option value="instructor" <%= locals.target_type === 'instructor' ? 'selected' : '' %>>Instructors</option>
                         <option value="course" <%= locals.target_type === 'course' ? 'selected' : '' %>>Courses</option>
                     </select>
@@ -89,7 +89,7 @@
                                     <td>
                                         <% if (announcement.target_type === 'all') { %>
                                             <span class="badge rounded-pill" style="background-color: var(--primary-color);">All Users</span>
-                                        <% } else if (announcement.target_type === 'student') { %>
+                                        <% } else if (announcement.target_type === 'students') { %>
                                             <span class="badge rounded-pill" style="background-color: var(--secondary-color);">Students</span>
                                         <% } else if (announcement.target_type === 'instructor') { %>
                                             <span class="badge rounded-pill" style="background-color: #ff9800;">Instructors</span>

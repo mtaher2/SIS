@@ -79,7 +79,9 @@
                                     <td>
                                         <% if (announcement.target_type === 'all') { %>
                                             <span class="badge bg-primary">All Users</span>
-                                        <% } else if (announcement.target_type === 'instructor') { %>
+                                        <% } else if (announcement.target_type === 'students') { %>
+                                            <span class="badge bg-success">Students</span>
+                                        <% } else if (announcement.target_type === 'instructors') { %>
                                             <span class="badge bg-warning text-dark">Instructors</span>
                                         <% } else if (announcement.target_type === 'course') { %>
                                             <span class="badge bg-success">Course</span>
