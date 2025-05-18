@@ -1,9 +1,11 @@
 const express = require("express");
 const router = express.Router();
-const path = require("path");
-const fs = require("fs");
-const { upload } = require("../utils/upload");
-const { isAuthenticated, isInstructor } = require("../utils/auth");
+const path = require('path');
+const fs = require('fs');
+const { upload } = require('../utils/upload');
+const { isAuthenticated, isInstructor } = require('../utils/auth');
+const Announcement = require('../models/Announcement');
+const User = require('../models/User');
 
 // Apply authentication to all API routes
 router.use(isAuthenticated);
@@ -153,4 +155,43 @@ router.post("/upload-base64", isInstructor, (req, res) => {
   }
 });
 
-module.exports = router;
+// Get unread announcements count
+router.get('/unread-announcements', async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
+        // Get the last time the user checked announcements
+        const lastViewedTime = req.query.lastViewedTime || 0;
+        const userId = req.session.user.user_id;
+        const userRole = req.session.user.role;
+        
+        // Find announcements visible to this user and created after the last viewed time
+        const filters = {
+            created_after: new Date(parseInt(lastViewedTime)),
+            is_active: true
+        };
+        
+        let announcements;
+        if (userRole === 'admin') {
+            // Admin sees all announcements
+            announcements = await Announcement.findAll(filters);
+        } else if (userRole === 'instructor') {
+            // Instructor sees general and instructor-targeted announcements
+            announcements = await Announcement.getVisibleAnnouncements(userId, 'instructor', filters);
+        } else if (userRole === 'student') {
+            // Student sees general and student-targeted announcements
+            announcements = await Announcement.getVisibleAnnouncements(userId, 'student', filters);
+        } else {
+            announcements = [];
+        }
+        
+        return res.json({ count: announcements.length, success: true });
+    } catch (error) {
+        console.error('Error getting unread announcements:', error);
+        return res.status(500).json({ error: 'Internal server error', success: false });
+    }
+});
+
+module.exports = router; 

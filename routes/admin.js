@@ -75,34 +75,21 @@ router.post(
 );
 
 // Announcement management
-router.get("/announcements", adminController.getAnnouncements);
-router.get("/announcements/create", adminController.getCreateAnnouncement);
-router.post(
-  "/announcements/create",
-  [
-    check("title", "Title is required").notEmpty(),
-    check("content", "Content is required").notEmpty(),
-    check("target_type", "Target type is required").notEmpty(),
-  ],
-  adminController.postCreateAnnouncement,
-);
-router.get("/announcements/edit/:id", adminController.getEditAnnouncement);
-router.post(
-  "/announcements/edit/:id",
-  [
-    check("title", "Title is required").notEmpty(),
-    check("content", "Content is required").notEmpty(),
-    check("target_type", "Target type is required").notEmpty(),
-  ],
-  adminController.postEditAnnouncement,
-);
-router.delete("/announcements/delete/:id", adminController.deleteAnnouncement);
-
-// Grade Approval Routes
-router.get("/grade-approvals", adminController.getGradeApprovals);
-router.get("/grades/:courseId/details", adminController.getGradeDetails);
-router.post("/grades/:courseId/approve", adminController.approveGrades);
-router.post("/grades/:courseId/reject", adminController.rejectGrades);
+router.get('/announcements', adminController.getAnnouncements);
+router.get('/announcements/create', adminController.getCreateAnnouncement);
+router.post('/announcements/create', [
+    check('title', 'Title is required').notEmpty(),
+    check('content', 'Content is required').notEmpty(),
+    check('target_type', 'Target type is required').notEmpty()
+], adminController.postCreateAnnouncement);
+router.get('/announcements/edit/:id', adminController.getEditAnnouncement);
+router.post('/announcements/edit/:id', [
+    check('title', 'Title is required').notEmpty(),
+    check('content', 'Content is required').notEmpty(),
+    check('target_type', 'Target type is required').notEmpty()
+], adminController.postEditAnnouncement);
+router.get('/announcements/:id', adminController.getAnnouncementDetails);
+router.delete('/announcements/delete/:id', adminController.deleteAnnouncement);
 
 // Method Override for DELETE requests
 router.post("/users/delete/:id", (req, res) => {

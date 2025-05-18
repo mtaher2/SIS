@@ -79,15 +79,18 @@
                                     <td>
                                         <% if (announcement.target_type === 'all') { %>
                                             <span class="badge bg-primary">All Users</span>
-                                        <% } else if (announcement.target_type === 'student') { %>
-                                            <span class="badge bg-info">Students</span>
+                                        <% } else if (announcement.target_type === 'students') { %>
+                                            <span class="badge bg-success">All Students</span>
                                         <% } else if (announcement.target_type === 'course') { %>
-                                            <span class="badge bg-success">Course: <%= announcement.course_code || '' %></span>
+                                            <span class="badge bg-info">
+                                                Course: <%= announcement.course_code || 'Unknown' %>
+                                            </span>
+                                        <% } else if (announcement.target_type === 'specific_users') { %>
+                                            <span class="badge bg-warning text-dark">Specific Users</span>
+                                            <div class="small text-muted">Including You</div>
                                         <% } %>
                                     </td>
-                                    <td>
-                                        <%= announcement.creator_name || 'Unknown' %>
-                                    </td>
+                                                                        <td>                                        <%= announcement.author_name || 'Unknown' %>                                    </td>
                                     <td>
                                         <%= new Date(announcement.created_at).toLocaleDateString() %>
                                     </td>

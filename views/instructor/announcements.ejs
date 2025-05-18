@@ -65,14 +65,7 @@
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Target</th>
-                                <th>Date</th>
-                                <th>Status</th>
-                                <th>Spam</th>
-                                <th class="text-end">Actions</th>
-                            </tr>
+                                                        <tr>                                <th>Title</th>                                <th>Target</th>                                <th>Created By</th>                                <th>Date</th>                                <th>Status</th>                                <th>Spam</th>                                <th class="text-end">Actions</th>                            </tr>
                         </thead>
                         <tbody>
                             <% announcements.forEach(announcement => { %>
@@ -86,12 +79,29 @@
                                     <td>
                                         <% if (announcement.target_type === 'all') { %>
                                             <span class="badge bg-primary">All Users</span>
-                                        <% } else if (announcement.target_type === 'instructor') { %>
+                                        <% } else if (announcement.target_type === 'students') { %>
+                                            <span class="badge bg-success">Students</span>
+                                        <% } else if (announcement.target_type === 'instructors') { %>
                                             <span class="badge bg-warning text-dark">Instructors</span>
                                         <% } else if (announcement.target_type === 'course') { %>
                                             <span class="badge bg-success">Course</span>
                                             <div class="small text-muted"><%= announcement.course_code || 'Unknown Course' %></div>
+                                        <% } else if (announcement.target_type === 'specific_users') { %>
+                                            <span class="badge bg-info">Specific Users</span>
+                                            <% if (announcement.recipients && announcement.recipients.length > 0) { %>
+                                                <div class="small text-muted">
+                                                    <%= announcement.recipients.slice(0, 2).map(r => r.full_name).join(', ') %>
+                                                    <% if (announcement.recipients.length > 2) { %>
+                                                        and <%= announcement.recipients.length - 2 %> more
+                                                    <% } %>
+                                                </div>
+                                            <% } else { %>
+                                                <a href="/instructor/announcements/<%= announcement.announcement_id %>" class="small">View Recipients</a>
+                                            <% } %>
                                         <% } %>
+                                    </td>
+                                    <td>
+                                        <%= announcement.author_name || 'Unknown' %>
                                     </td>
                                     <td>
                                         <%= new Date(announcement.created_at).toLocaleDateString() %>

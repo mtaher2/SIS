@@ -1,10 +1,11 @@
-const User = require("../models/User");
-const Instructor = require("../models/Instructor");
-const Course = require("../models/Course");
-const Announcement = require("../models/Announcement");
-const { validationResult } = require("express-validator");
-const { upload, deleteFile } = require("../utils/upload");
-const db = require("../db");
+const User = require('../models/User');
+const Instructor = require('../models/Instructor');
+const Course = require('../models/Course');
+const Announcement = require('../models/Announcement');
+const Student = require('../models/Student');
+const { validationResult } = require('express-validator');
+const { upload, deleteFile } = require('../utils/upload');
+const db = require('../db');
 
 // Instructor dashboard
 exports.getDashboard = async (req, res) => {
@@ -635,66 +636,112 @@ exports.getAnnouncements = async (req, res) => {
 
 // Create course announcement
 exports.getCreateAnnouncement = async (req, res) => {
-  try {
-    const instructorId = req.session.user.user_id;
-    const courses = await Instructor.getAssignedCourses(instructorId);
-
-    res.render("instructor/create-announcement", {
-      title: "Create Announcement",
-      user: req.session.user,
-      courses,
-    });
-  } catch (error) {
-    console.error("Error getting create announcement form:", error);
-    req.flash(
-      "error_msg",
-      "An error occurred while preparing the announcement form",
-    );
-    res.redirect("/instructor/announcements");
-  }
+    try {
+        const instructorId = req.session.user.user_id;
+        const courses = await Instructor.getAssignedCourses(instructorId);
+        
+        // Get students for specific targeting
+        const students = await User.findByRole('student');
+        
+        // Get instructors for specific targeting (excluding current instructor)
+        const instructors = await User.findByRole('instructor');
+        // Filter out the current instructor
+        const filteredInstructors = instructors.filter(instructor => instructor.user_id != instructorId);
+        
+        res.render('instructor/create-announcement', {
+            title: 'Create Announcement',
+            user: req.session.user,
+            courses,
+            students,
+            instructors: filteredInstructors
+        });
+    } catch (error) {
+        console.error('Error getting create announcement form:', error);
+        req.flash('error_msg', 'An error occurred while preparing the announcement form');
+        res.redirect('/instructor/announcements');
+    }
 };
 
 // Process create announcement form
 exports.postCreateAnnouncement = async (req, res) => {
-  try {
-    const instructorId = req.session.user.user_id;
-    const { title, content, target_type, course_id } = req.body;
-
-    // If targeting a course, ensure instructor is assigned to it
-    if (target_type === "course") {
-      const courses = await Instructor.getAssignedCourses(instructorId);
-      const isCourseAssigned = courses.some(
-        (course) => course.course_id == course_id,
-      );
-
-      if (!isCourseAssigned) {
-        req.flash(
-          "error_msg",
-          "You are not authorized to create announcements for this course",
-        );
-        return res.redirect("/instructor/announcements/create");
-      }
+    try {
+        const instructorId = req.session.user.user_id;
+        const { title, content, target_type, course_id, specific_users } = req.body;
+        
+        // If targeting a course, ensure instructor is assigned to it
+        if (target_type === 'course') {
+            const courses = await Instructor.getAssignedCourses(instructorId);
+            const isCourseAssigned = courses.some(course => course.course_id == course_id);
+            
+            if (!isCourseAssigned) {
+                req.flash('error_msg', 'You are not authorized to create announcements for this course');
+                return res.redirect('/instructor/announcements/create');
+            }
+        }
+        
+        // Create announcement
+        const announcementData = {
+            title,
+            content,
+            created_by: instructorId,
+            target_type,
+            course_id: target_type === 'course' ? course_id : null,
+            is_active: true
+        };
+        
+        // If targeting specific users, add them to the recipients
+        if (target_type === 'specific_users' && specific_users) {
+            // Convert to array if it's not already (happens when only one user is selected)
+            const recipients = Array.isArray(specific_users) ? specific_users : [specific_users];
+            announcementData.recipients = recipients;
+        }
+        
+        await Announcement.create(announcementData);
+        
+        req.flash('success_msg', 'Announcement created successfully');
+        res.redirect('/instructor/announcements');
+    } catch (error) {
+        console.error('Error creating announcement:', error);
+        req.flash('error_msg', 'An error occurred while creating the announcement');
+        res.redirect('/instructor/announcements/create');
     }
+};
 
-    // Create announcement
-    const announcementData = {
-      title,
-      content,
-      created_by: instructorId,
-      target_type,
-      course_id: target_type === "course" ? course_id : null,
-      is_active: true,
-    };
-
-    await Announcement.create(announcementData);
-
-    req.flash("success_msg", "Announcement created successfully");
-    res.redirect("/instructor/announcements");
-  } catch (error) {
-    console.error("Error creating announcement:", error);
-    req.flash("error_msg", "An error occurred while creating the announcement");
-    res.redirect("/instructor/announcements/create");
-  }
+// View announcement details
+exports.getAnnouncementDetails = async (req, res) => {
+    try {
+        const announcementId = req.params.id;
+        const instructorId = req.session.user.user_id;
+        
+        // Get the announcement
+        const announcement = await Announcement.findById(announcementId);
+        
+        if (!announcement) {
+            req.flash('error_msg', 'Announcement not found');
+            return res.redirect('/instructor/announcements');
+        }
+        
+        // Check if this instructor is the author
+        if (announcement.created_by != instructorId) {
+            req.flash('error_msg', 'You are not authorized to view this announcement');
+            return res.redirect('/instructor/announcements');
+        }
+        
+        // If it's targeting specific users, get the recipients
+        if (announcement.target_type === 'specific_users' && !announcement.recipients) {
+            announcement.recipients = await Announcement.getRecipients(announcementId);
+        }
+        
+        res.render('instructor/announcement-details', {
+            title: 'Announcement Details',
+            user: req.session.user,
+            announcement
+        });
+    } catch (error) {
+        console.error('Error viewing announcement details:', error);
+        req.flash('error_msg', 'An error occurred while retrieving the announcement');
+        res.redirect('/instructor/announcements');
+    }
 };
 
 // Grade management - view assignments

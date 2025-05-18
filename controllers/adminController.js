@@ -605,140 +605,205 @@ exports.getAnnouncements = async (req, res) => {
 
 // Announcement management - create announcement form
 exports.getCreateAnnouncement = async (req, res) => {
-  try {
-    // Get courses for targeting announcement to a specific course
-    const courses = await Course.findAll({ is_active: true });
-
-    res.render("admin/create-announcement", {
-      title: "Create Announcement",
-      user: req.session.user,
-      courses,
-    });
-  } catch (error) {
-    console.error("Error getting data for announcement creation:", error);
-    req.flash(
-      "error_msg",
-      "An error occurred while preparing the announcement form",
-    );
-    res.redirect("/admin/announcements");
-  }
+    try {
+        // Get courses for targeting announcement to a specific course
+        const courses = await Course.findAll({ is_active: true });
+        
+        // Get all students for targeting specific students
+        const students = await User.findByRole('student');
+        
+        // Get all instructors for targeting specific instructors
+        const instructors = await User.findByRole('instructor');
+        
+        res.render('admin/create-announcement', {
+            title: 'Create Announcement',
+            user: req.session.user,
+            courses,
+            students,
+            instructors
+        });
+    } catch (error) {
+        console.error('Error getting data for announcement creation:', error);
+        req.flash('error_msg', 'An error occurred while preparing the announcement form');
+        res.redirect('/admin/announcements');
+    }
 };
 
 // Announcement management - process create announcement form
 exports.postCreateAnnouncement = async (req, res) => {
-  try {
-    // Check validation errors
-    const errors = validationResult(req);
-
-    if (!errors.isEmpty()) {
-      // Retrieve data for form again
-      const courses = await Course.findAll({ is_active: true });
-
-      return res.status(400).render("admin/create-announcement", {
-        title: "Create Announcement",
-        user: req.session.user,
-        courses,
-        errors: errors.array(),
-        formData: req.body,
-      });
+    try {
+        // Check validation errors
+        const errors = validationResult(req);
+        
+        if (!errors.isEmpty()) {
+            // Retrieve data for form again
+            const courses = await Course.findAll({ is_active: true });
+            const students = await User.findByRole('student');
+            const instructors = await User.findByRole('instructor');
+            
+            return res.status(400).render('admin/create-announcement', {
+                title: 'Create Announcement',
+                user: req.session.user,
+                courses,
+                students,
+                instructors,
+                errors: errors.array(),
+                formData: req.body
+            });
+        }
+        
+        const { title, content, target_type, course_id, specific_users } = req.body;
+        
+        // Create announcement
+        const announcementData = {
+            title,
+            content,
+            created_by: req.session.user.user_id,
+            target_type,
+            course_id: target_type === 'course' ? course_id : null,
+            is_active: true
+        };
+        
+        // If targeting specific users, add them to the recipients
+        if (target_type === 'specific_users' && specific_users) {
+            // Convert to array if it's not already (happens when only one user is selected)
+            const recipients = Array.isArray(specific_users) ? specific_users : [specific_users];
+            announcementData.recipients = recipients;
+        }
+        
+        await Announcement.create(announcementData);
+        
+        req.flash('success_msg', 'Announcement created successfully');
+        res.redirect('/admin/announcements');
+    } catch (error) {
+        console.error('Error creating announcement:', error);
+        req.flash('error_msg', 'An error occurred while creating the announcement');
+        res.redirect('/admin/announcements/create');
     }
+};
 
-    const { title, content, target_type, course_id } = req.body;
-
-    // Create announcement
-    const announcementData = {
-      title,
-      content,
-      created_by: req.session.user.user_id,
-      target_type,
-      course_id: target_type === "course" ? course_id : null,
-      is_active: true,
-    };
-
-    await Announcement.create(announcementData);
-
-    req.flash("success_msg", "Announcement created successfully");
-    res.redirect("/admin/announcements");
-  } catch (error) {
-    console.error("Error creating announcement:", error);
-    req.flash("error_msg", "An error occurred while creating the announcement");
-    res.redirect("/admin/announcements/create");
-  }
+// Announcement management - view announcement details
+exports.getAnnouncementDetails = async (req, res) => {
+    try {
+        const announcementId = req.params.id;
+        const announcement = await Announcement.findById(announcementId);
+        
+        if (!announcement) {
+            req.flash('error_msg', 'Announcement not found');
+            return res.redirect('/admin/announcements');
+        }
+        
+        // If it's targeting specific users, get the recipients
+        if (announcement.target_type === 'specific_users' && !announcement.recipients) {
+            announcement.recipients = await Announcement.getRecipients(announcementId);
+        }
+        
+        res.render('admin/announcement-details', {
+            title: 'Announcement Details',
+            user: req.session.user,
+            announcement
+        });
+    } catch (error) {
+        console.error('Error viewing announcement details:', error);
+        req.flash('error_msg', 'An error occurred while retrieving the announcement');
+        res.redirect('/admin/announcements');
+    }
 };
 
 // Announcement management - edit announcement form
 exports.getEditAnnouncement = async (req, res) => {
-  try {
-    const announcementId = req.params.id;
-    const announcement = await Announcement.findById(announcementId);
-
-    if (!announcement) {
-      req.flash("error_msg", "Announcement not found");
-      return res.redirect("/admin/announcements");
+    try {
+        const announcementId = req.params.id;
+        const announcement = await Announcement.findById(announcementId);
+        
+        if (!announcement) {
+            req.flash('error_msg', 'Announcement not found');
+            return res.redirect('/admin/announcements');
+        }
+        
+        // Get courses for targeting announcement to a specific course
+        const courses = await Course.findAll({ is_active: true });
+        
+        // Get all students for targeting specific students
+        const students = await User.findByRole('student');
+        
+        // Get all instructors for targeting specific instructors
+        const instructors = await User.findByRole('instructor');
+        
+        // If targeting specific users, get the recipients
+        if (announcement.target_type === 'specific_users' && !announcement.recipients) {
+            announcement.recipients = await Announcement.getRecipients(announcementId);
+        }
+        
+        res.render('admin/edit-announcement', {
+            title: 'Edit Announcement',
+            user: req.session.user,
+            announcement,
+            courses,
+            students,
+            instructors
+        });
+    } catch (error) {
+        console.error('Error getting announcement for edit:', error);
+        req.flash('error_msg', 'An error occurred while retrieving the announcement');
+        res.redirect('/admin/announcements');
     }
-
-    // Get courses for targeting announcement to a specific course
-    const courses = await Course.findAll({ is_active: true });
-
-    res.render("admin/edit-announcement", {
-      title: "Edit Announcement",
-      user: req.session.user,
-      announcement,
-      courses,
-    });
-  } catch (error) {
-    console.error("Error getting announcement for edit:", error);
-    req.flash(
-      "error_msg",
-      "An error occurred while retrieving the announcement",
-    );
-    res.redirect("/admin/announcements");
-  }
 };
 
 // Announcement management - process edit announcement form
 exports.postEditAnnouncement = async (req, res) => {
-  try {
-    const announcementId = req.params.id;
-
-    // Check validation errors
-    const errors = validationResult(req);
-
-    if (!errors.isEmpty()) {
-      // Retrieve data for form again
-      const announcement = await Announcement.findById(announcementId);
-      const courses = await Course.findAll({ is_active: true });
-
-      return res.status(400).render("admin/edit-announcement", {
-        title: "Edit Announcement",
-        user: req.session.user,
-        announcement,
-        courses,
-        errors: errors.array(),
-        formData: req.body,
-      });
+    try {
+        const announcementId = req.params.id;
+        
+        // Check validation errors
+        const errors = validationResult(req);
+        
+        if (!errors.isEmpty()) {
+            // Retrieve data for form again
+            const announcement = await Announcement.findById(announcementId);
+            const courses = await Course.findAll({ is_active: true });
+            const students = await User.findByRole('student');
+            const instructors = await User.findByRole('instructor');
+            
+            return res.status(400).render('admin/edit-announcement', {
+                title: 'Edit Announcement',
+                user: req.session.user,
+                announcement,
+                courses,
+                students,
+                instructors,
+                errors: errors.array(),
+                formData: req.body
+            });
+        }
+        
+        const { title, content, target_type, course_id, is_active, specific_users } = req.body;
+        
+        // Update announcement
+        const announcementData = {
+            title,
+            content,
+            target_type,
+            course_id: target_type === 'course' ? course_id : null,
+            is_active: is_active === 'true'
+        };
+        
+        // If targeting specific users, add them to the recipients
+        if (target_type === 'specific_users' && specific_users) {
+            // Convert to array if it's not already (happens when only one user is selected)
+            const recipients = Array.isArray(specific_users) ? specific_users : [specific_users];
+            announcementData.recipients = recipients;
+        }
+        
+        await Announcement.update(announcementId, announcementData);
+        
+        req.flash('success_msg', 'Announcement updated successfully');
+        res.redirect('/admin/announcements');
+    } catch (error) {
+        console.error('Error updating announcement:', error);
+        req.flash('error_msg', 'An error occurred while updating the announcement');
+        res.redirect(`/admin/announcements/edit/${req.params.id}`);
     }
-
-    const { title, content, target_type, course_id, is_active } = req.body;
-
-    // Update announcement
-    const announcementData = {
-      title,
-      content,
-      target_type,
-      course_id: target_type === "course" ? course_id : null,
-      is_active: is_active === "true",
-    };
-
-    await Announcement.update(announcementId, announcementData);
-
-    req.flash("success_msg", "Announcement updated successfully");
-    res.redirect("/admin/announcements");
-  } catch (error) {
-    console.error("Error updating announcement:", error);
-    req.flash("error_msg", "An error occurred while updating the announcement");
-    res.redirect(`/admin/announcements/edit/${req.params.id}`);
-  }
 };
 
 // Announcement management - delete announcement

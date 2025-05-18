@@ -31,6 +31,9 @@ const { restrictAccess } = require("./utils/auth");
 // Import spam detector service
 const spamDetector = require('./utils/spamDetector');
 
+// Database migration imports
+const createAnnouncementRecipientsTable = require('./migrations/add_announcement_recipients');
+
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -157,56 +160,75 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start the server
-app.listen(PORT, async () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`http://localhost:${PORT}`);
-    
-    // Run database migrations for spam detection
+// Run migrations if needed
+async function runMigrations() {
     try {
-        await updateAnnouncementsTable();
+        console.log('Checking for needed database migrations...');
+        
+        // Add announcement recipients table migration
+        await createAnnouncementRecipientsTable();
+        
+        // Add additional migrations here
+        
+        console.log('Database migrations completed.');
     } catch (error) {
-        console.error('Failed to update database schema for spam detection:', error);
+        console.error('Error running database migrations:', error);
     }
-    
-    // Check if spam detection service is available
-    try {
-        const isSpamDetectorAvailable = await spamDetector.isServiceAvailable();
-        if (isSpamDetectorAvailable) {
-            console.log('✅ Spam detection service is running');
-        } else {
-            console.warn('⚠️ Spam detection service is not available. Announcements will not be classified for spam. Start the service by running:');
-            console.warn('cd SIS-spam_detector && python run.py');
-        }
-    } catch (error) {
-        console.error('Error checking spam detection service:', error);
-    }
+}
 
-    // Check if main chatbot service is available
-    try {
-        const response = await fetch('http://localhost:5002/health');
-        if (response.ok) {
-            console.log('✅ Main chatbot service is running');
-        } else {
+// Run migrations before starting the server
+runMigrations().then(() => {
+    // Start the server
+    app.listen(PORT, async () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`http://localhost:${PORT}`);
+        
+        // Initialize the spam detector
+        try {
+            console.log('Initializing spam detection service...');
+            spamDetector.initialize();
+            console.log('Spam detection service initialized successfully');
+        } catch (error) {
+            console.error('Error initializing spam detection service:', error);
+        }
+
+        // Check if spam detection service is ready
+        try {
+            const ready = await spamDetector.isReady();
+            console.log(`Spam detection service ready: ${ready}`);
+        } catch (error) {
+            console.error('Error checking spam detection service:', error);
+        }
+
+        // Check if main chatbot service is available
+        try {
+            const response = await fetch('http://localhost:5002/health');
+            if (response.ok) {
+                console.log('✅ Main chatbot service is running');
+            } else {
+                console.warn('⚠️ Main chatbot service is not available. Start the service by running:');
+                console.warn('cd chatbot && python chatbot.py');
+            }
+        } catch (error) {
             console.warn('⚠️ Main chatbot service is not available. Start the service by running:');
             console.warn('cd chatbot && python chatbot.py');
         }
-    } catch (error) {
-        console.warn('⚠️ Main chatbot service is not available. Start the service by running:');
-        console.warn('cd chatbot && python chatbot.py');
-    }
 
-    // Check if student chatbot service is available
-    try {
-        const response = await fetch('http://localhost:5005/health');
-        if (response.ok) {
-            console.log('✅ Student chatbot service is running');
-        } else {
+        // Check if student chatbot service is available
+        try {
+            const response = await fetch('http://localhost:5005/health');
+            if (response.ok) {
+                console.log('✅ Student chatbot service is running');
+            } else {
+                console.warn('⚠️ Student chatbot service is not available. Start the service by running:');
+                console.warn('cd chatbot && python chatbotStudent.py');
+            }
+        } catch (error) {
             console.warn('⚠️ Student chatbot service is not available. Start the service by running:');
             console.warn('cd chatbot && python chatbotStudent.py');
         }
-    } catch (error) {
-        console.warn('⚠️ Student chatbot service is not available. Start the service by running:');
-        console.warn('cd chatbot && python chatbotStudent.py');
-    }
+    });
+}).catch(err => {
+    console.error('Failed to run migrations and start server:', err);
+    process.exit(1);
 }); 

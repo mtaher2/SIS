@@ -216,17 +216,14 @@ router.post(
 );
 
 // Announcement management
-router.get("/announcements", instructorController.getAnnouncements);
-router.get("/announcements/create", instructorController.getCreateAnnouncement);
-router.post(
-  "/announcements/create",
-  [
-    check("title", "Title is required").notEmpty(),
-    check("content", "Content is required").notEmpty(),
-    check("target_type", "Target type is required").notEmpty(),
-  ],
-  instructorController.postCreateAnnouncement,
-);
+router.get('/announcements', instructorController.getAnnouncements);
+router.get('/announcements/create', instructorController.getCreateAnnouncement);
+router.post('/announcements/create', [
+    check('title', 'Title is required').notEmpty(),
+    check('content', 'Content is required').notEmpty(),
+    check('target_type', 'Target type is required').notEmpty()
+], instructorController.postCreateAnnouncement);
+router.get('/announcements/:id', instructorController.getAnnouncementDetails);
 
 // Grade Management Routes
 router.get("/courses/:courseId/grades", instructorController.getCourseGrades);
