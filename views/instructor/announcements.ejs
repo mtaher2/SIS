@@ -84,8 +84,25 @@
                                         <% } else if (announcement.target_type === 'course') { %>
                                             <span class="badge bg-success">Course</span>
                                             <div class="small text-muted"><%= announcement.course_code || 'Unknown Course' %></div>
+                                        <% } else if (announcement.target_type === 'specific_users') { %>
+                                            <span class="badge bg-info">Specific Users</span>
+                                            <% if (announcement.recipients && announcement.recipients.length > 0) { %>
+                                                <div class="small text-muted">
+                                                    <%= announcement.recipients.slice(0, 2).map(r => r.full_name).join(', ') %>
+                                                    <% if (announcement.recipients.length > 2) { %>
+                                                        and <%= announcement.recipients.length - 2 %> more
+                                                    <% } %>
+                                                </div>
+                                            <% } else { %>
+                                                <a href="/instructor/announcements/<%= announcement.announcement_id %>" class="small">View Recipients</a>
+                                            <% } %>
                                         <% } %>
-                                                                        </td>                                    <td>                                        <%= announcement.author_name || 'Unknown' %>                                    </td>                                    <td>                                        <%= new Date(announcement.created_at).toLocaleDateString() %>
+                                    </td>
+                                    <td>
+                                        <%= announcement.author_name || 'Unknown' %>
+                                    </td>
+                                    <td>
+                                        <%= new Date(announcement.created_at).toLocaleDateString() %>
                                     </td>
                                     <td>
                                         <% if (announcement.is_active) { %>

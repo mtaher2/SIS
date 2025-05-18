@@ -203,12 +203,12 @@ class Announcement {
                 conditions.push('a.is_spam = ?');
                 params.push(filters.is_spam);
             }
-
-            // Add search filter
+            
+            // Apply search filter to title and content
             if (filters.search) {
-                conditions.push('(a.title LIKE ? OR a.content LIKE ? OR c.course_code LIKE ?)');
-                const searchTerm = `%${filters.search}%`;
-                params.push(searchTerm, searchTerm, searchTerm);
+                conditions.push('(a.title LIKE ? OR a.content LIKE ?)');
+                params.push(`%${filters.search}%`);
+                params.push(`%${filters.search}%`);
             }
             
             // Filter for specific recipient
@@ -224,10 +224,10 @@ class Announcement {
             }
             
             if (conditions.length > 0) {
-                query += ` WHERE ${conditions.join(' AND ')}`;
+                query += ' WHERE ' + conditions.join(' AND ');
             }
             
-            // Add ordering
+            // Add sorting
             query += ' ORDER BY a.created_at DESC';
             
             // Add limit
@@ -239,41 +239,15 @@ class Announcement {
             const [rows] = await db.query(query, params);
             
             // For announcements targeting specific users, get the recipients
-            if (filters.include_recipients) {
-                const specificUserAnnouncements = rows.filter(a => a.target_type === 'specific_users');
-                
-                if (specificUserAnnouncements.length > 0) {
-                    const announcementIds = specificUserAnnouncements.map(a => a.announcement_id);
-                    
-                    const [recipients] = await db.query(
-                        `SELECT ar.announcement_id, ar.user_id, CONCAT(u.first_name, ' ', u.last_name) AS full_name,
-                            r.role_name
-                         FROM announcement_recipients ar
-                         JOIN users u ON ar.user_id = u.user_id
-                         JOIN roles r ON u.role_id = r.role_id
-                         WHERE ar.announcement_id IN (?)`,
-                        [announcementIds]
-                    );
-                    
-                    // Group recipients by announcement ID
-                    const recipientsByAnnouncement = recipients.reduce((acc, recipient) => {
-                        if (!acc[recipient.announcement_id]) {
-                            acc[recipient.announcement_id] = [];
-                        }
-                        acc[recipient.announcement_id].push(recipient);
-                        return acc;
-                    }, {});
-                    
-                    // Attach recipients to their announcements
-                    rows.forEach(announcement => {
-                        if (announcement.target_type === 'specific_users') {
-                            announcement.recipients = recipientsByAnnouncement[announcement.announcement_id] || [];
-                        }
-                    });
+            const announcements = await Promise.all(rows.map(async (announcement) => {
+                if (announcement.target_type === 'specific_users') {
+                    const recipients = await this.getRecipients(announcement.announcement_id);
+                    announcement.recipients = recipients;
                 }
-            }
+                return announcement;
+            }));
             
-            return rows;
+            return announcements;
         } catch (error) {
             console.error('Error finding announcements:', error);
             throw error;
@@ -373,7 +347,17 @@ class Announcement {
             }
             
             const [rows] = await db.query(query, params);
-            return rows;
+            
+            // For announcements targeting specific users, get the recipients
+            const announcements = await Promise.all(rows.map(async (announcement) => {
+                if (announcement.target_type === 'specific_users') {
+                    const recipients = await this.getRecipients(announcement.announcement_id);
+                    announcement.recipients = recipients;
+                }
+                return announcement;
+            }));
+            
+            return announcements;
         } catch (error) {
             console.error('Error getting visible announcements:', error);
             throw error;
