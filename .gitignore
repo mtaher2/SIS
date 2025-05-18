@@ -6,6 +6,10 @@ package-lock.json
 .env
 config.env
 
+chroma_db/
+u142656869_sis_db.sql
+chatbot/
+
 # Log files
 logs/
 *.log

@@ -1,71 +1,83 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const submissionForm = document.getElementById('submissionForm');
-    const fileInput = document.getElementById('submissionFile');
-    const submitButton = document.querySelector('button[type="submit"]');
-    const errorDiv = document.getElementById('error-message');
-    const successDiv = document.getElementById('success-message');
+document.addEventListener("DOMContentLoaded", function () {
+  const submissionForm = document.getElementById("submissionForm");
+  const fileInput = document.getElementById("submissionFile");
+  const submitButton = document.querySelector('button[type="submit"]');
+  const errorDiv = document.getElementById("error-message");
+  const successDiv = document.getElementById("success-message");
 
-    if (submissionForm) {
-        submissionForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            // Reset messages
-            errorDiv.textContent = '';
-            successDiv.textContent = '';
-            
-            // Disable submit button
-            submitButton.disabled = true;
-            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...';
+  if (submissionForm) {
+    submissionForm.addEventListener("submit", async function (e) {
+      e.preventDefault();
 
-            try {
-                const formData = new FormData(submissionForm);
-                
-                const response = await fetch(submissionForm.action, {
-                    method: 'POST',
-                    body: formData
-                });
+      // Reset messages
+      errorDiv.textContent = "";
+      successDiv.textContent = "";
 
-                const data = await response.json();
+      // Disable submit button
+      submitButton.disabled = true;
+      submitButton.innerHTML =
+        '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...';
 
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to submit assignment');
-                }
+      try {
+        const formData = new FormData(submissionForm);
 
-                // Show success message
-                successDiv.textContent = data.message || 'Assignment submitted successfully!';
-                
-                // Update the UI to show submission details instead of reloading
-                const submissionSection = document.querySelector('.card-body');
-                if (submissionSection && data.submission) {
-                    // Create submission details HTML
-                    const submissionHTML = createSubmissionDetailsHTML(data.submission);
-                    submissionSection.innerHTML = submissionHTML;
-                } else {
-                    // If we can't update the UI directly, reload the page
-                    window.location.reload();
-                }
-
-            } catch (error) {
-                errorDiv.textContent = error.message;
-                submitButton.disabled = false;
-                submitButton.textContent = 'Submit Assignment';
-            }
+        const response = await fetch(submissionForm.action, {
+          method: "POST",
+          body: formData,
         });
-    }
 
-    // Helper function to create submission details HTML
-    function createSubmissionDetailsHTML(submission) {
-        const submittedDate = new Date(submission.submitted_at).toLocaleDateString('en-US', 
-            { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-        
-        let fileHTML = '';
-        if (submission.file_url) {
-            let iconClass = 'fas fa-file';
-            if (submission.file_type === 'pdf') iconClass = 'fas fa-file-pdf text-danger';
-            else if (['doc', 'docx'].includes(submission.file_type)) iconClass = 'fas fa-file-word text-primary';
-            else if (['ppt', 'pptx'].includes(submission.file_type)) iconClass = 'fas fa-file-powerpoint text-warning';
-            
-            fileHTML = `
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to submit assignment");
+        }
+
+        // Show success message
+        successDiv.textContent =
+          data.message || "Assignment submitted successfully!";
+
+        // Update the UI to show submission details instead of reloading
+        const submissionSection = document.querySelector(".card-body");
+        if (submissionSection && data.submission) {
+          // Create submission details HTML
+          const submissionHTML = createSubmissionDetailsHTML(data.submission);
+          submissionSection.innerHTML = submissionHTML;
+        } else {
+          // If we can't update the UI directly, reload the page
+          window.location.reload();
+        }
+      } catch (error) {
+        errorDiv.textContent = error.message;
+        submitButton.disabled = false;
+        submitButton.textContent = "Submit Assignment";
+      }
+    });
+  }
+
+  // Helper function to create submission details HTML
+  function createSubmissionDetailsHTML(submission) {
+    const submittedDate = new Date(submission.submitted_at).toLocaleDateString(
+      "en-US",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      },
+    );
+
+    let fileHTML = "";
+    if (submission.file_url) {
+      let iconClass = "fas fa-file";
+      if (submission.file_type === "pdf")
+        iconClass = "fas fa-file-pdf text-danger";
+      else if (["doc", "docx"].includes(submission.file_type))
+        iconClass = "fas fa-file-word text-primary";
+      else if (["ppt", "pptx"].includes(submission.file_type))
+        iconClass = "fas fa-file-powerpoint text-warning";
+
+      fileHTML = `
                 <div class="submission-details">
                     <div class="alert alert-success mb-4">
                         <i class="fas fa-check-circle me-2"></i>
@@ -100,26 +112,26 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                 </div>`;
+    }
+
+    return fileHTML;
+  }
+
+  // File input validation
+  if (fileInput) {
+    fileInput.addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (file) {
+        // Check file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+          errorDiv.textContent = "File size exceeds 10MB limit";
+          fileInput.value = "";
+          return;
         }
-        
-        return fileHTML;
-    }
 
-    // File input validation
-    if (fileInput) {
-        fileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                // Check file size (10MB limit)
-                if (file.size > 10 * 1024 * 1024) {
-                    errorDiv.textContent = 'File size exceeds 10MB limit';
-                    fileInput.value = '';
-                    return;
-                }
-
-                // Clear any previous error messages
-                errorDiv.textContent = '';
-            }
-        });
-    }
-}); 
+        // Clear any previous error messages
+        errorDiv.textContent = "";
+      }
+    });
+  }
+});

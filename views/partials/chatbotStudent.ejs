@@ -1,0 +1,373 @@
+<!-- Chatbot Container -->
+<div class="chatbot-container">
+  <!-- Chat Icon Button -->
+  <button class="chatbot-icon" onclick="toggleStudentChat()">
+    <i class="fas fa-graduation-cap"></i>
+  </button>
+
+  <!-- Chat Window -->
+  <div class="chat-window" id="studentChatWindow">
+    <div class="chat-header">
+      <h3>Academic Assistant</h3>
+      <button class="close-btn" onclick="toggleStudentChat()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="chat-messages" id="studentChatMessages">
+      <div class="message bot">
+        <div class="message-content">
+          Hello! I'm your academic assistant. I can help you with programming, mathematics, and other subjects. How can I assist you today?
+        </div>
+      </div>
+    </div>
+    <div class="chat-input">
+      <input
+        type="text"
+        id="studentUserInput"
+        placeholder="Ask your academic question..."
+        onkeypress="handleStudentKeyPress(event)"
+      />
+      <button onclick="sendStudentMessage()">
+        <i class="fas fa-paper-plane"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Chatbot Styles -->
+<style>
+  .chatbot-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .chatbot-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: #a1d55d;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1001;
+  }
+
+  .chatbot-icon:hover {
+    transform: scale(1.1);
+  }
+
+  .chat-window {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 380px;
+    height: 500px;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    display: none;
+    flex-direction: column;
+    z-index: 1000;
+  }
+
+  .chat-header {
+    padding: 15px;
+    background: #a1d55d;
+    color: white;
+    border-radius: 15px 15px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .chat-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+  }
+
+  .chat-messages {
+    flex-grow: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+  }
+
+  .message {
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .message.user {
+    align-items: flex-end;
+  }
+
+  .message.bot {
+    align-items: flex-start;
+  }
+
+  .message-content {
+    padding: 10px 15px;
+    border-radius: 15px;
+    max-width: 85%;
+    word-wrap: break-word;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .message.user .message-content {
+    background: #a1d55d;
+    color: black;
+    border-bottom-right-radius: 5px;
+  }
+
+  .message.bot .message-content {
+    background: white;
+    color: #333;
+    border-bottom-left-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+
+  .chat-input {
+    padding: 15px;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 8px;
+    background: white;
+    border-radius: 0 0 15px 15px;
+  }
+
+  .chat-input input {
+    flex-grow: 1;
+    padding: 8px 15px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    outline: none;
+    font-size: 14px;
+  }
+
+  .chat-input button {
+    background: #a1d55d;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    font-size: 14px;
+  }
+
+  .chat-input button:hover {
+    background: #357abd;
+  }
+
+  /* Loading Animation */
+  .typing-indicator {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    align-self: flex-start;
+  }
+
+  .typing-indicator span {
+    height: 10px;
+    width: 10px;
+    background: #a1d55d;
+    display: inline-block;
+    border-radius: 50%;
+    margin-right: 5px;
+    animation: typing 1s infinite;
+  }
+
+  .typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+    margin-right: 0;
+  }
+
+  @keyframes typing {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0); }
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .chat-window {
+      width: 100%;
+      height: 100%;
+      bottom: 0;
+      right: 0;
+      border-radius: 0;
+    }
+
+    .chat-header {
+      border-radius: 0;
+    }
+
+    .chat-input {
+      border-radius: 0;
+    }
+
+    .chatbot-container {
+      bottom: 10px;
+      right: 10px;
+    }
+  }
+
+  /* Code Block Styling */
+  .code-block {
+    background: #f5f5f5;
+    padding: 10px;
+    border-radius: 5px;
+    font-family: monospace;
+    margin: 10px 0;
+    overflow-x: auto;
+  }
+
+  /* Reference Styling */
+  .reference {
+    font-size: 12px;
+    color: #666;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+  }
+
+  /* Highlighted Terms */
+  mark {
+    background-color: #fff3cd;
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+</style>
+
+<!-- Chatbot Script -->
+<script>
+  function toggleStudentChat() {
+    const chatWindow = document.getElementById('studentChatWindow');
+    chatWindow.style.display = chatWindow.style.display === 'none' ? 'flex' : 'none';
+  }
+
+  function handleStudentKeyPress(event) {
+    if (event.key === 'Enter') {
+      sendStudentMessage();
+    }
+  }
+
+  // Format bot message for better readability
+  function formatBotMessage(text) {
+    if (!text) return '';
+    // Replace code blocks (```code```)
+    text = text.replace(/```([\s\S]*?)```/g, '<pre class="code-block">$1</pre>');
+    // Replace inline code (`code`)
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Replace bold (**text**)
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Replace italics (*text*)
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Replace numbered lists
+    text = text.replace(/\n(\d+\. .+)/g, '<ol>$1</ol>');
+    // Replace bullet lists
+    text = text.replace(/\n[-*] (.+)/g, '<ul><li>$1</li></ul>');
+    // Replace newlines with <br>, but not inside <pre> or <ul>/<ol>
+    text = text.replace(/\n/g, '<br>');
+    return text;
+  }
+
+  function addStudentMessage(content, isUser = false) {
+    const messagesContainer = document.getElementById('studentChatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    // Format bot messages for readability
+    contentDiv.innerHTML = isUser ? content : formatBotMessage(content);
+    
+    messageDiv.appendChild(contentDiv);
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  function showTypingIndicator() {
+    const messagesContainer = document.getElementById('studentChatMessages');
+    const indicator = document.createElement('div');
+    indicator.className = 'typing-indicator';
+    indicator.innerHTML = '<span></span><span></span><span></span>';
+    indicator.id = 'typingIndicator';
+    messagesContainer.appendChild(indicator);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  function removeTypingIndicator() {
+    const indicator = document.getElementById('typingIndicator');
+    if (indicator) {
+      indicator.remove();
+    }
+  }
+
+  async function sendStudentMessage() {
+    const input = document.getElementById('studentUserInput');
+    const message = input.value.trim();
+    
+    if (message) {
+      addStudentMessage(message, true);
+      input.value = '';
+      showTypingIndicator();
+
+      try {
+        const response = await fetch('http://localhost:5005/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ question: message }),
+        });
+
+        const data = await response.json();
+        removeTypingIndicator();
+
+        if (data.error) {
+          addStudentMessage('Sorry, I encountered an error. Please try again.');
+        } else {
+          addStudentMessage(data.answer);
+        }
+      } catch (error) {
+        removeTypingIndicator();
+        addStudentMessage('Sorry, I encountered an error. Please try again.');
+        console.error('Chatbot error:', error);
+      }
+    }
+  }
+</script> 

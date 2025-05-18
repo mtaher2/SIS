@@ -1,0 +1,202 @@
+<!-- Grade Approvals -->
+<div class="grade-approvals">
+    <!-- Page Header -->
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h1 class="dashboard-heading">
+                <i class="fas fa-check-circle me-2"></i> Grade Approvals
+            </h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/admin/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Grade Approvals</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Pending Approvals -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Pending Grade Approvals</h5>
+                </div>
+                <div class="card-body">
+                    <% if (pendingApprovals && pendingApprovals.length > 0) { %>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Course</th>
+                                        <th>Instructor</th>
+                                        <th>Students</th>
+                                        <th>Posted Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% pendingApprovals.forEach(approval => { %>
+                                        <tr>
+                                            <td>
+                                                <strong><%= approval.course_code %></strong><br>
+                                                <small class="text-muted"><%= approval.course_name %></small>
+                                            </td>
+                                            <td>
+                                                <%= approval.instructor_name %><br>
+                                                <small class="text-muted"><%= approval.instructor_email %></small>
+                                            </td>
+                                            <td>
+                                                <%= approval.student_count %> students<br>
+                                                <button class="btn btn-sm btn-link view-details" 
+                                                        data-course="<%= approval.course_id %>">
+                                                    View Details
+                                                </button>
+                                            </td>
+                                            <td>
+                                                <%= new Date(approval.posted_at).toLocaleDateString() %><br>
+                                                <small class="text-muted">
+                                                    <%= new Date(approval.posted_at).toLocaleTimeString() %>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-success approve-grades" 
+                                                        data-course="<%= approval.course_id %>">
+                                                    <i class="fas fa-check me-1"></i> Approve
+                                                </button>
+                                                <button class="btn btn-sm btn-danger reject-grades" 
+                                                        data-course="<%= approval.course_id %>">
+                                                    <i class="fas fa-times me-1"></i> Reject
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    <% } else { %>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i> No pending grade approvals.
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grade Details Modal -->
+    <div class="modal fade" id="gradeDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Grade Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Quiz</th>
+                                    <th>Assignment</th>
+                                    <th>Midterm</th>
+                                    <th>Final</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gradeDetailsBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // View Grade Details
+    document.querySelectorAll('.view-details').forEach(button => {
+        button.addEventListener('click', async function() {
+            const courseId = this.dataset.course;
+            try {
+                const response = await fetch(`/admin/grades/${courseId}/details`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const modalBody = document.getElementById('gradeDetailsBody');
+                    modalBody.innerHTML = data.grades.map(grade => `
+                        <tr>
+                            <td>${grade.student_name}</td>
+                            <td>${grade.quiz_score || 'N/A'}</td>
+                            <td>${grade.assignment_score || 'N/A'}</td>
+                            <td>${grade.midterm_score || 'N/A'}</td>
+                            <td>${grade.final_score || 'N/A'}</td>
+                            <td>${grade.total_score ? grade.total_score.toFixed(2) : 'N/A'}</td>
+                        </tr>
+                    `).join('');
+                    
+                    new bootstrap.Modal(document.getElementById('gradeDetailsModal')).show();
+                }
+            } catch (error) {
+                console.error('Error fetching grade details:', error);
+                alert('Failed to load grade details');
+            }
+        });
+    });
+
+    // Approve Grades
+    document.querySelectorAll('.approve-grades').forEach(button => {
+        button.addEventListener('click', async function() {
+            if (confirm('Are you sure you want to approve these grades?')) {
+                const courseId = this.dataset.course;
+                try {
+                    const response = await fetch(`/admin/grades/${courseId}/approve`, {
+                        method: 'POST'
+                    });
+                    
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        throw new Error('Failed to approve grades');
+                    }
+                } catch (error) {
+                    console.error('Error approving grades:', error);
+                    alert('Failed to approve grades');
+                }
+            }
+        });
+    });
+
+    // Reject Grades
+    document.querySelectorAll('.reject-grades').forEach(button => {
+        button.addEventListener('click', async function() {
+            const reason = prompt('Please provide a reason for rejection:');
+            if (reason) {
+                const courseId = this.dataset.course;
+                try {
+                    const response = await fetch(`/admin/grades/${courseId}/reject`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ reason })
+                    });
+                    
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        throw new Error('Failed to reject grades');
+                    }
+                } catch (error) {
+                    console.error('Error rejecting grades:', error);
+                    alert('Failed to reject grades');
+                }
+            }
+        });
+    });
+});
+</script> 
