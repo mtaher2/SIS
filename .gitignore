@@ -8,7 +8,6 @@ config.env
 
 chroma_db/
 u142656869_sis_db.sql
-chatbot/
 
 # Log files
 logs/
@@ -34,3 +33,58 @@ public/storage/*
 # OS files
 .DS_Store
 Thumbs.db 
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Flask
+instance/
+.webassets-cache
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Machine Learning
+app/models/saved/*.pkl
+app/models/saved/*.joblib
+app/models/saved/*.h5
+app/models/saved/*.model
+app/models/saved/*.bin
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+venv/
+venv_new/
+__pycache__/
+*.pyc
